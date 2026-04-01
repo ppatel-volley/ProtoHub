@@ -21,17 +21,4 @@ export enum GameStatus {
     New = "new",
 }
 
-/**
- * The type of paywall that a game uses at the hub level.
- * - Soft: the hub will show a paywall when the user tries to launch the game,
- *   but if the subscription is declined the game will launch anyway.
- * - Hard: the hub will show a paywall when the user tries to launch the game,
- *   and the game will not launch if the subscription is declined.
- * - None: the hub will not show a paywall when the user tries to launch the game,
- *   and the game will launch.
- */
-export enum PaywallType {
-    Soft = "soft",
-    Hard = "hard",
-    None = "none",
-}
+// PaywallType removed — Proto-Hub games are free (no subscription system)
