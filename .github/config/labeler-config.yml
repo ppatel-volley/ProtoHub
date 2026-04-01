@@ -1,0 +1,17 @@
+"Hub":
+  - any:
+    - changed-files:
+      - any-glob-to-any-file:
+        - "apps/client/**"
+        - "apps/hub/**"
+
+"Mobile":
+  - any:
+    - changed-files:
+      - any-glob-to-any-file: "apps/mobile/**"
+
+"CI":
+  - any:
+    - changed-files:
+      - any-glob-to-any-file: ".github/**"
+

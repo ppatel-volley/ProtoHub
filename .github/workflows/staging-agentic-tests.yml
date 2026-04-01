@@ -1,0 +1,107 @@
+name: Agentic Tests on Staging
+
+on:
+    workflow_dispatch:
+        inputs:
+            debug_timeout:
+                description: "debug timeout in seconds"
+                required: false
+    repository_dispatch:
+        types:
+            - hub-client-release-staging
+
+env:
+    TOTAL_SHARDS: 3
+
+jobs:
+    agentic-tests:
+        timeout-minutes: 15
+        runs-on: shared-k8s-staging
+        container:
+            image: mcr.microsoft.com/playwright:v1.53.0-jammy
+            options: --name hub-staging-agentic-tests-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: [1, 2, 3]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cache/ms-playwright
+                      apps/client/node_modules/.cache/playwright
+                  key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-playwright-
+
+            - name: Install Playwright Browsers
+              run: |
+                  cd apps/client && pnpm exec playwright install chromium
+
+            - name: Run agentic tests on staging (shard ${{ matrix.shard }}/${{ env.TOTAL_SHARDS }})
+              run: |
+                  cd apps/client
+                  echo "Running shard ${{ matrix.shard }} of ${{ env.TOTAL_SHARDS }}"
+                  pnpm test:agentic:staging --shard=${{ matrix.shard }}/${{ env.TOTAL_SHARDS }}
+              env:
+                  TEST_BASE_URL: ${{ secrets.STAGING_HUB_URL || 'https://game-clients-staging.volley.tv/hub/' }}
+                  TEST_ENVIRONMENT: staging
+                  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+            - name: Compress Test Results
+              if: failure()
+              run: |
+                  cd apps/client
+                  tar -czf test-results-agentic-${{ matrix.shard }}.tar.gz \
+                    playwright-report-agentic/ \
+                    test-results/ 2>/dev/null || true
+                  echo "📊 Compressed artifact size:"
+                  ls -lh test-results-agentic-${{ matrix.shard }}.tar.gz || echo "No test results to compress"
+
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: playwright-report-agentic-${{ matrix.shard }}
+                  path: |
+                      apps/client/playwright-report-agentic/
+                  retention-days: 7
+
+            - uses: actions/upload-artifact@v4
+              if: failure()
+              with:
+                  name: hub-agentic-test-results-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+                  path: apps/client/test-results-agentic-${{ matrix.shard }}.tar.gz
+                  if-no-files-found: ignore
+                  retention-days: 7
+
+            - name: Wait for Debug Timeout
+              if: always() && inputs.debug_timeout != '' && inputs.debug_timeout != '0'
+              run: |
+                  echo "⏱️ Waiting for debug timeout: ${{ inputs.debug_timeout }} seconds"
+                  sleep ${{ inputs.debug_timeout }}
+
+    agentic-tests-complete:
+        runs-on: ubuntu-latest
+        needs: agentic-tests
+        if: always()
+        steps:
+            - name: Check test results
+              run: |
+                  if [[ "${{ needs.agentic-tests.result }}" == "failure" ]]; then
+                      echo "Agentic tests failed"
+                      exit 1
+                  elif [[ "${{ needs.agentic-tests.result }}" == "cancelled" ]]; then
+                      echo "Agentic tests were cancelled"
+                      exit 1
+                  else
+                      echo "All agentic tests completed successfully"
+                  fi

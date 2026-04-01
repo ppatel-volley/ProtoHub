@@ -1,0 +1,45 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Development Workflow
+
+This document outlines development workflows and processes for the Hub project.
+
+## Getting Started
+
+1. Install Node.js 22+ and pnpm 10+
+2. Run `pnpm install` to install all dependencies
+3. Use `pnpm dev` to start all applications in development mode
+
+## Common Commands
+
+- `pnpm dev` - Start all applications in development mode
+- `pnpm build` - Build all applications
+- `pnpm lint` - Run ESLint on all packages
+- `pnpm lint:fix` - Fix ESLint issues automatically
+- `pnpm test` - Run tests across packages
+
+## Versioning
+
+The project uses `semantic-release` for automated release management:
+
+- `pnpm pre-release` - Dry-run release to preview next version
+- `pnpm release` - Create a production release
+
+## Docker
+
+A Dockerfile is available for containerized deployment.
+
+## Environment Variables
+
+Environment variables are stored in `.env` files with sensitive values excluded from version control.
+
+## Code Quality Standards
+  - Do not add comments unless they provide
+  critical context that cannot be understood from
+  well-written, semantic code
+  - Never disable linting rules without a very good
+   reason and detailed explanation
+  - Before completing any task, ALWAYS run: pnpm typecheck, pnpm test:unit, pnpm lint

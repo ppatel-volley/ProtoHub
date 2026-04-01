@@ -1,0 +1,93 @@
+@use "../../Variables.scss" as *;
+
+.gameTile {
+  position: relative;
+  transition: transform 0.2s ease;
+  box-sizing: border-box;
+  width: scale(387);
+  height: scale(219);
+  border-radius: scale(15);
+  flex: none;
+  flex-grow: 0;
+
+  a {
+    display: block;
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+
+  img {
+    width: 100%;
+    height: scale(219);
+    border-radius: scale(6);
+    object-fit: cover;
+    position: absolute;
+    z-index: 0;
+  }
+
+  &.focused {
+    z-index: 10;
+  }
+
+  &.pressed {
+    animation: pressScale 0.2s ease-out forwards;
+    transition: none;
+  }
+}
+
+@keyframes pressScale {
+  0% {
+    transform: scale3d(1, 1, 1);
+  }
+
+  75% {
+    transform: scale3d(0.92, 0.92, 1);
+  }
+
+  100% {
+    transform: scale3d(1, 1, 1);
+  }
+}
+
+.statusTag {
+  position: absolute;
+  width: 50%;
+  height: 20%;
+  top: 8%;
+  left: -8%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.beta {
+  width: 60%;
+  height: 35%;
+  top: 0%;
+  left: -12%;
+}
+
+.coming-soon {
+  width: 60%;
+  height: 35%;
+  top: 0%;
+  left: 0%;
+}
+
+.new {
+  width: 50%;
+  height: 20%;
+  top: 8%;
+  left: -8%;
+}
+
+.tileAnimation {
+  width: 100%;
+  height: scale(219);
+  border-radius: scale(6);
+  object-fit: cover;
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}

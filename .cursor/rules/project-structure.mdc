@@ -1,0 +1,24 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Project Structure
+
+This is a monorepo for a TV games hub application using pnpm workspaces.
+
+## Repository Organization
+
+- `/apps` - Contains the main applications
+  - `/apps/client` - Frontend React application
+  - `/apps/server` - Backend Express.js server
+  - `/apps/server/src/shared` - Shared game logic and types (exported via `@hub/server` and `@hub/server/types`)
+
+- `/packages` - Contains shared packages used across applications
+  - `/packages/eslint-config` - Shared ESLint configuration
+  - `/packages/identity-client` - Identity API client
+  - `/packages/tsconfig` - Shared TypeScript configuration
+
+## Package Manager
+
+This project uses pnpm (v10.6.5+) as its package manager with workspaces for monorepo management.

@@ -1,0 +1,21 @@
+.button {
+    background: linear-gradient(180deg, #8e8259 0%, #cac49d 94.88%);
+    border-radius: 10vw;
+    padding: 1vw 8vw;
+    font-size: 3vw;
+    font-family: Gilroy, sans-serif;
+    font-weight: 700;
+    transition: background 0.2s ease-in-out;
+
+    &.focused,
+    &:focus,
+    &:hover {
+        background: linear-gradient(180deg, #FFE88B 0%, #F6D300 94.88%);
+        filter: drop-shadow(0 0 2vw #f6d91c);
+    }
+
+
+    &:active {
+        background: linear-gradient(180deg, #B2A261 0%, #AC9400 94.88%);
+    }
+}

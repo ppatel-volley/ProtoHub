@@ -1,0 +1,15 @@
+.inputLabel {
+    width: 330px;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 30px;
+    text-align: center;
+    margin: 0;
+}
+
+.inputLabelName {
+    font-size: 1.5em;
+    font-weight: 700;
+    text-align: center;
+} 

@@ -1,0 +1,39 @@
+.input {
+    width: 333px;
+    height: 60px;
+    border-radius: 18px;
+    background: #fff;
+    color: #333;
+    font-size: 20px;
+    font-weight: 700;
+    font-feature-settings:
+        'liga' off,
+        'clig' off;
+    letter-spacing: 10px;
+    text-align: center;
+    border: none;
+    padding: 0;
+}
+
+.input::placeholder {
+    color: #9d9ea8;
+    font-size: 20px;
+    font-weight: 700;
+    font-feature-settings:
+        'liga' off,
+        'clig' off;
+    letter-spacing: 10px;
+    text-align: center;
+}
+
+.input:focus {
+    outline: 0.1em solid #ffec37;
+    outline-offset: -2px;
+}
+
+.input.error {
+    outline: 0.1em solid #ff0000;
+    outline-offset: -2px;
+    background: #fff5f5;
+    color: #ff3b30;
+} 

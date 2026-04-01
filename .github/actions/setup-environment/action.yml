@@ -1,0 +1,48 @@
+name: "Setup Environment"
+description: "Sets up the environment"
+
+inputs:
+  npm-token:
+    description: "NPM token"
+    required: true
+    
+runs:
+  using: "composite"
+  steps:
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        run_install: false
+
+    - name: Get pnpm store directory
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+    - name: Cache pnpm store
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
+    - name: Configure pnpm for private packages
+      run: |
+        echo "@volley:registry=https://registry.npmjs.org/" >> ~/.npmrc
+        echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+      shell: bash
+      env:
+        NPM_TOKEN: ${{ inputs.npm-token }}
+
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        pnpm install --frozen-lockfile
+      env:
+        NPM_TOKEN: ${{ inputs.npm-token }}

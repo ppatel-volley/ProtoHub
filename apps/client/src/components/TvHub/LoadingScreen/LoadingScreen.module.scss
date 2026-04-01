@@ -1,0 +1,74 @@
+@use "../../../Variables.scss" as *;
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(0.9);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.loading {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: $background-blue;
+    z-index: $z-index-loading-screen;
+    touch-action: none;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.loadingLogo {
+    width: scale(1920);
+    height: auto;
+    touch-action: none;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    position: absolute;
+    top: 0;
+    left: 0;
+
+    // This is a hack to make the video look like it's part of the logo
+    // Basically the video shows the poster 2 px below where we show the logo
+    border-bottom: 2px #000120 solid;
+    margin-top: -2px;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: transform;
+    background-color: #000120;
+    transition: opacity 0.3s ease-out;
+}
+
+.spinnerContainer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, 0%);
+    width: 50%;
+    height: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: $z-index-loading-spinner;
+}
+
+.hidden {
+    opacity: 0;
+}

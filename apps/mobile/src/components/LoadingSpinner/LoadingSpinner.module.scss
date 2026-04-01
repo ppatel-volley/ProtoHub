@@ -1,0 +1,25 @@
+@use "../../Variables.scss" as *;
+
+.spinnerContainer {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.spinner {
+    animation: rotate 1.2s linear infinite;
+    height: scale(132);
+    width: scale(132);
+}
+
+@keyframes rotate {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}

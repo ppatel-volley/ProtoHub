@@ -1,0 +1,67 @@
+.background {
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    background: linear-gradient(180deg, #27114a 0%, #00001f 100%);
+    backdrop-filter: blur(55.35px);
+    overflow: hidden;
+}
+
+.weekendBackground {
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    background: #0a0322;
+    overflow: hidden;
+}
+
+.topHighlight {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100vw;
+    height: 23vh;
+    flex-shrink: 0;
+    background: radial-gradient(
+        83.44% 94.85% at 87.73% -6.42%,
+        rgba(255, 101, 249, 0.7) 0%,
+        rgba(187, 101, 255, 0) 100%
+    );
+}
+
+.bottomHighlight {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    height: 44vh;
+    flex-shrink: 0;
+    background: radial-gradient(
+        78.57% 89.34% at 100% -5.56%,
+        rgba(152, 101, 255, 0.42) 0%,
+        rgba(187, 101, 255, 0) 100%
+    );
+    transform: rotate(180deg);
+}
+
+.lottie {
+    position: absolute;
+    width: 230px;
+    height: 150px;
+    pointer-events: none;
+}
+
+.topLottie {
+    composes: lottie;
+    top: 0;
+    right: 0;
+}
+
+.bottomLottie {
+    composes: lottie;
+    bottom: 0;
+    left: 0;
+    transform: rotate(180deg);
+} 

@@ -1,0 +1,38 @@
+@use "../../../Variables.scss" as *;
+
+.spinnerContainer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.spinner {
+    width: scale(120);
+    height: scale(120);
+    transform: rotate(-90deg);
+}
+
+.spinnerArc {
+    stroke-dasharray: 0, 250; /* Circumference: 2 * π * 40 */
+    stroke-dashoffset: 250; /* Start fully hidden */
+    animation: trim 1.5s ease-in-out infinite;
+}
+
+/* Trim keyframes based on your spec */
+@keyframes trim {
+    0% {
+        stroke-dasharray: 0, 250;
+        stroke-dashoffset: 250; /* Fully hidden (100%) */
+    }
+
+    33% {
+        stroke-dasharray: 63, 250;
+
+        /* stroke-dashoffset: 62.8; /* 75% start (25% visible) */
+    }
+
+    100% {
+        stroke-dasharray: 0, 250;
+        stroke-dashoffset: 0; /* Fully revealed (0% offset) */
+    }
+}

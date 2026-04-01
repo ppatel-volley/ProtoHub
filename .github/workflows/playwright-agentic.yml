@@ -1,0 +1,100 @@
+name: Agentic Tests
+
+on:
+    workflow_dispatch:
+
+env:
+    CLIENT_BASE_URL: http://localhost:4173/hub/
+    TOTAL_SHARDS: 3
+
+jobs:
+    agentic-tests:
+        timeout-minutes: 15
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: [1, 2, 3]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cache/ms-playwright
+                      apps/client/node_modules/.cache/playwright
+                  key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-playwright-
+
+            - name: Install Playwright Browsers
+              run: |
+                  cd apps/client && pnpm exec playwright install --with-deps chromium
+
+            - name: Install xvfb
+              run: sudo apt-get update && sudo apt-get install -y xvfb
+
+            - name: Build production bundle
+              run: |
+                  cd apps/client
+                  ENVIRONMENT=dev pnpm build
+              env:
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            - name: Start preview server
+              run: |
+                  cd apps/client
+                  pnpm preview &
+                  for i in {1..30}; do
+                      if curl --silent --fail "$CLIENT_BASE_URL" > /dev/null; then
+                          echo "Preview server is up!"
+                          break
+                      fi
+                      echo "Waiting for preview server to start... ($i/30)"
+                      sleep 1
+                  done
+                  if ! curl --silent --fail "$CLIENT_BASE_URL" > /dev/null; then
+                      echo "Preview server did not start within 30 seconds."
+                      exit 1
+                  fi
+
+            - name: Run agentic tests (shard ${{ matrix.shard }}/${{ env.TOTAL_SHARDS }})
+              run: |
+                  cd apps/client
+                  echo "Running shard ${{ matrix.shard }} of ${{ env.TOTAL_SHARDS }}"
+                  xvfb-run --auto-servernum pnpm test:agentic:nobuild --shard=${{ matrix.shard }}/${{ env.TOTAL_SHARDS }}
+              env:
+                  TEST_BASE_URL: ${{ env.CLIENT_BASE_URL }}
+                  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: playwright-report-agentic-${{ matrix.shard }}
+                  path: |
+                      apps/client/playwright-report-agentic/
+                  retention-days: 7
+
+    agentic-tests-complete:
+        runs-on: ubuntu-latest
+        needs: agentic-tests
+        if: always()
+        steps:
+            - name: Check test results
+              run: |
+                  if [[ "${{ needs.agentic-tests.result }}" == "failure" ]]; then
+                      echo "Agentic tests failed"
+                      exit 1
+                  elif [[ "${{ needs.agentic-tests.result }}" == "cancelled" ]]; then
+                      echo "Agentic tests were cancelled"
+                      exit 1
+                  else
+                      echo "All agentic tests completed successfully"
+                  fi

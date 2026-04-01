@@ -1,0 +1,104 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Hub Project Best Practices
+
+This document outlines best practices for creating navigation-focused UIs for TV applications and games where keyboard/remote/controller navigation is primary.
+
+## Component Architecture
+
+- **Separation of Concerns**: Create separate components for different aspects of the UI
+  - `FocusableContainer`: Manages the spatial navigation context
+  - `FocusableItem`: Individual focusable elements
+  - `FocusIndicator`: Visual indicator showing the current focus
+
+- **Use React's Composition Pattern**: Build complex UIs from simple, reusable components
+
+## Focus Management
+
+- **Use Norigin Spatial Navigation**: Leverage this library for spatial/directional navigation
+  - Initialize with `init()` in your application entry point
+  - Use `useFocusable()` hook to make elements focusable
+  - Provide `FocusContext` for nested focusable areas
+
+- **Prevent Re-render Loops**:
+  - Use `useRef` instead of `useState` for values that shouldn't trigger re-renders
+  - Create stable callback functions with empty dependency arrays when appropriate
+  - Use refs to access current state in callbacks without dependencies
+
+## Floating Focus Indicators
+
+- **Separate Visual from Logic**:
+  - Create a dedicated component for the focus indicator
+  - Position it using absolute or fixed positioning
+  - Use CSS transitions for smooth movement
+
+- **Initialization Pattern**:
+  - Position the indicator before making it visible
+  - Use a short delay to ensure DOM is ready
+  - Initialize focus only once using a useEffect with empty dependency array
+
+## Custom Hooks
+
+- **Create Focused Hooks**: Design custom hooks for specific UI patterns
+  - Example: `useFocusTracking` for managing floating focus indicators
+
+- **Stable Hook Design**:
+  - Use `useCallback` with no dependencies for stable function references
+  - Store configuration values in refs to prevent re-renders
+  - Use refs to track internal state that shouldn't trigger re-renders
+
+## CSS Best Practices
+
+- **Transition Animations**:
+  - Use CSS transitions for smooth focus indicator movement
+  - Keep animations subtle and non-distracting
+  - Combine transitions with subtle scaling effects for depth
+
+- **Visual Feedback**:
+  - Provide clear visual indication of focused items
+  - Use subtle animations to draw attention to the focused item
+  - Consider accessibility with appropriate contrast and scaling
+
+## Example Implementation
+
+```tsx
+// Component example - see the GamesCarousel implementation
+const NavigationGrid = (): JSX.Element => {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const { focusPosition, initialized, initializeWithElement, updateFocusPosition } = useFocusTracking()
+
+  // One-time initialization
+  useEffect(() => {
+    const initializeFirstItem = (): void => {
+      if (!containerRef.current) return
+      const firstItem = containerRef.current.querySelector('[data-index="0"]')
+      if (firstItem) initializeWithElement(firstItem as HTMLElement)
+    }
+    
+    const timeoutId = setTimeout(initializeFirstItem, 100)
+    return (): void => { clearTimeout(timeoutId) }
+  }, []) // Empty dependency array - runs once
+
+  return (
+    <div ref={containerRef}>
+      <FocusIndicator position={focusPosition} initialized={initialized} />
+      
+      <FocusableContainer className="navigation-grid" defaultFocusKey="item-0">
+        {items.map((item, index) => (
+          <FocusableItem
+            key={item.id}
+            focusKey={`item-${index}`}
+            onFocus={updateFocusPosition}
+            dataAttributes={{ index: index.toString() }}
+          >
+            {item.content}
+          </FocusableItem>
+        ))}
+      </FocusableContainer>
+    </div>
+  )
+}
+```

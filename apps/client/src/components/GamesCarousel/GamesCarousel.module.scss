@@ -1,0 +1,16 @@
+@use "../../Variables.scss" as *;
+
+.container {
+    position: relative; /* Important for absolute positioning of children */
+    width: 100%;
+    height: 100%;
+}
+
+.gamesCarousel {
+    position: absolute;
+    width: 100%;
+    padding-left: scale(91);
+    display: flex;
+
+    @include flex-gap-horizontal(scale(64));
+}

@@ -1,0 +1,183 @@
+name: Deploy Server
+
+permissions:
+    contents: read
+
+concurrency:
+    group: deploy-server-${{ github.ref_name }}
+    cancel-in-progress: true
+
+on:
+    workflow_call:
+        inputs:
+            version:
+                required: true
+                type: string
+            release_commit:
+                required: true
+                type: string
+        secrets:
+            NPM_TOKEN:
+                required: true
+            AWS_ACCESS_KEY:
+                required: true
+            AWS_SECRET_ACCESS_KEY:
+                required: true
+
+jobs:
+    check-tag:
+        runs-on: ubuntu-latest
+        outputs:
+            is_beta: ${{ steps.check_tag.outputs.is_beta }}
+        steps:
+            - name: Check if beta tag
+              id: check_tag
+              run: |
+                  if [[ "${{ github.ref }}" == refs/tags/v*-beta* ]]; then
+                    echo "is_beta=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "is_beta=false" >> $GITHUB_OUTPUT
+                  fi
+
+    promote-to-dev:
+        needs: [check-tag]
+        runs-on: ubuntu-latest
+        environment: dev-server
+        env:
+            IMAGE_NAME: "hub"
+        outputs:
+            docker_tag: ${{ steps.docker.outputs.tag }}
+        concurrency:
+            group: server_dev_environment
+            cancel-in-progress: true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ inputs.release_commit }}
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Build Server
+              env:
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: |
+                  pnpm build --filter=@hub/server
+
+            - name: Login to ECR
+              uses: docker/login-action@v1
+              with:
+                  registry: 375633680607.dkr.ecr.us-east-1.amazonaws.com
+                  username: ${{ secrets.AWS_ACCESS_KEY }}
+                  password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+            - name: Output shaShort
+              id: shaShort
+              shell: bash
+              run: |
+                  echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+            - name: Output full sha
+              id: shaFull
+              shell: bash
+              run: |
+                  echo "full=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+            - name: Output Git branch
+              id: branch
+              shell: bash
+              run: |
+                  echo "name=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+
+            - name: Output timestamp
+              id: ts
+              shell: bash
+              run: |
+                  echo "ts=$(date +%Y%m%d%s)" >> $GITHUB_OUTPUT
+
+            - name: Output Docker Image Tag
+              id: docker
+              shell: bash
+              run: |
+                  echo "tag=main-${{steps.shaShort.outputs.short}}-${{steps.ts.outputs.ts}}" >> $GITHUB_OUTPUT
+
+            - name: Build and Push Docker Image
+              id: docker_build
+              uses: docker/build-push-action@v2
+              with:
+                  push: true
+                  tags: 375633680607.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_NAME }}:${{steps.docker.outputs.tag}}
+                  labels: |
+                      org.opencontainers.image.gitrevision=${{steps.shaFull.outputs.full}}
+                  build-args: |
+                      NPM_TOKEN=${{ secrets.NPM_TOKEN }}
+                  file: ./Dockerfile
+                  context: ./
+
+    promote-to-staging:
+        needs: [check-tag, promote-to-dev]
+        if: ${{ needs.check-tag.outputs.is_beta == 'false' }}
+        runs-on: ubuntu-latest
+        environment: staging-server
+        env:
+            IMAGE_NAME: "hub"
+        concurrency:
+            group: server_staging_environment
+            cancel-in-progress: true
+        steps:
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Login to ECR
+              uses: docker/login-action@v1
+              with:
+                  registry: 375633680607.dkr.ecr.us-east-1.amazonaws.com
+                  username: ${{ secrets.AWS_ACCESS_KEY }}
+                  password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+            - name: Tag and Push to Staging
+              run: |
+                  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 375633680607.dkr.ecr.us-east-1.amazonaws.com
+                  docker pull 375633680607.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_NAME }}:${{ needs.promote-to-dev.outputs.docker_tag }}
+                  TIMESTAMP=$(date +%Y%m%d%H%M%S)
+                  docker tag 375633680607.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_NAME }}:${{ needs.promote-to-dev.outputs.docker_tag }} 375633680607.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_NAME }}:staging-$TIMESTAMP
+                  docker push 375633680607.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_NAME }}:staging-$TIMESTAMP
+
+    promote-to-production:
+        needs: [check-tag, promote-to-staging, promote-to-dev]
+        if: ${{ needs.check-tag.outputs.is_beta == 'false' }}
+        runs-on: ubuntu-latest
+        environment: production-server
+        env:
+            IMAGE_NAME: "hub"
+        concurrency:
+            group: server_production_environment
+            cancel-in-progress: true
+        steps:
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Login to ECR
+              uses: docker/login-action@v1
+              with:
+                  registry: 375633680607.dkr.ecr.us-east-1.amazonaws.com
+                  username: ${{ secrets.AWS_ACCESS_KEY }}
+                  password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+            - name: Tag and Push to Production
+              run: |
+                  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 375633680607.dkr.ecr.us-east-1.amazonaws.com
+                  docker pull 375633680607.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_NAME }}:${{ needs.promote-to-dev.outputs.docker_tag }}
+                  docker tag 375633680607.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_NAME }}:${{ needs.promote-to-dev.outputs.docker_tag }} 375633680607.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_NAME }}:v${{ inputs.version }}
+                  docker push 375633680607.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_NAME }}:v${{ inputs.version }}

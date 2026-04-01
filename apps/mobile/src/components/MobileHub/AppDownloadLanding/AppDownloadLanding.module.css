@@ -1,0 +1,72 @@
+.appDownloadContainer {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 16vh;
+}
+
+.weekendContainer {
+    composes: appDownloadContainer;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 0;
+}
+
+.weekendContent {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+    max-width: 567px;
+    width: 100%;
+    padding: 24px 24px 32px;
+    overflow: clip;
+    box-sizing: border-box;
+}
+
+.weekendHeader {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    width: 100%;
+}
+
+.appDownloadContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.version {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    color: #8a8a9c;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* For screens wider than 500px */
+@media screen and (min-width: 500px) {
+    .appDownloadContainer {
+        padding-top: 20vh;
+    }
+
+    .weekendContainer {
+        padding-top: 24px;
+    }
+}
+
+/* For landscape orientation */
+@media screen and (min-width: 500px) and (orientation: landscape) {
+    .appDownloadContainer {
+        padding-top: 12vh;
+    }
+
+    .weekendContainer {
+        padding-top: 24px;
+    }
+}

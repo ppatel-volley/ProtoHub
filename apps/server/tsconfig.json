@@ -1,0 +1,17 @@
+{
+    "extends": "@hub/tsconfig/node.json",
+    "compilerOptions": {
+        "jsx": "react-jsx",
+        "outDir": "./dist"
+    },
+    "include": [
+        "src/**/*",
+        "test/**/*",
+        "eslint.config.mjs",
+        "esbuild.config.mjs",
+        "esbuild.dev.config.mjs",
+        "jest.config.ts",
+        "playwright.config.ts"
+    ],
+    "exclude": ["node_modules", "dist"]
+}

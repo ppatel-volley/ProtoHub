@@ -1,0 +1,8 @@
+# Shared code
+* @Volley-Inc/hub @Volley-Inc/tv-remote
+
+# TV Hub specific
+/apps/client/src/components/TvHub/ @Volley-Inc/hub
+
+# Mobile Hub specific
+/apps/client/src/components/MobileHub/ @Volley-Inc/tv-remote

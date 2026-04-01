@@ -1,0 +1,126 @@
+@use "../../../Variables.scss" as *;
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgb(0 0 0 / 50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: $z-index-modal;
+}
+
+.modal {
+    background: #1a1a1a;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgb(0 0 0 / 50%);
+    outline: none;
+    min-width: max(25vw, 400px);
+    max-width: 500px;
+    width: fit-content;
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.content {
+    padding: 32px;
+    text-align: center;
+}
+
+.title {
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 16px;
+    text-shadow: 0 2px 4px rgb(0 0 0 / 30%);
+}
+
+.message {
+    color: #b8c5d6;
+    font-size: 1rem;
+    margin: 0 0 32px;
+    line-height: 1.5;
+}
+
+.buttonContainer {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+}
+
+.dismissButton {
+    background: transparent;
+    color: #b8c5d6;
+    border: 1px solid #4a5568;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+        background: rgb(255 255 255 / 10%);
+        border-color: #718096;
+        color: #fff;
+    }
+
+    &:focus {
+        outline: 2px solid #4a5568;
+        outline-offset: 2px;
+    }
+}
+
+.closeButton {
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+        background: #0056b3;
+    }
+
+    &:focus {
+        outline: 2px solid #007bff;
+        outline-offset: 2px;
+    }
+}
+
+// Mobile-specific adjustments
+@media (width <= 768px) {
+    .modal {
+        min-width: 90vw;
+        max-width: 90vw;
+        margin: 20px;
+    }
+
+    .content {
+        padding: 24px;
+    }
+
+    .title {
+        font-size: 1.3rem;
+    }
+
+    .message {
+        font-size: 0.9rem;
+    }
+}

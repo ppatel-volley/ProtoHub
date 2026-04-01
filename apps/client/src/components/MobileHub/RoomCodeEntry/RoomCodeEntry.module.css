@@ -1,0 +1,74 @@
+.container {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 23vh;
+}
+
+@media screen and (max-width: 768px) {
+    .container {
+        padding-top: 15vh;
+        padding-bottom: 1em;
+    }
+}
+
+.closeButton {
+    position: absolute;
+    top: 12%;
+    right: 5%;
+    width: 44px;
+    height: 44px;
+    transition: opacity 0.2s ease;
+}
+
+.closeButton:active {
+    opacity: 0.5;
+}
+
+.closeButton img {
+    width: 15.004px;
+    height: 14.996px;
+    object-fit: contain;
+}
+
+.formSection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.labelAndInput {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.labelAndInput > :first-child {
+    margin-bottom: 20px;
+}
+
+.labelAndInput > :nth-child(2) {
+    margin-bottom: 10px;
+}
+
+.labelError {
+    margin-top: 0.6em;
+}
+
+.supportSection {
+    text-align: center;
+}
+
+.version {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    color: #8a8a9c;
+    font-size: 14px;
+    font-weight: 500;
+} 

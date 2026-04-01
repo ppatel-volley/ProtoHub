@@ -1,0 +1,74 @@
+$light-purple: #ecdeff;
+$background-blue: #02001c;
+$white: #f1f1f1;
+$dark-gray: #1a1a1a;
+$modal-highlight-yellow: #ffec37;
+
+// Z-Index Scale (Dewey Decimal System)
+// Organized by tiers with room for expansion. Use these variables instead of magic numbers.
+// ──────────────────────────────────────────────────────────────────────────────
+// Range       | Tier         | Purpose
+// ──────────────────────────────────────────────────────────────────────────────
+// -1          | Background   | Behind everything
+// 0-9         | Base         | Default stacking, local layering
+// 10-99       | Interactive  | Focus indicators, hover states
+// 100-999     | Floating UI  | Tooltips, dropdowns, popovers
+// 1000-1999   | Overlays     | Modals, confirmation dialogs
+// 2000-2999   | System UI    | Persistent logo, loading screens, checkout overlay
+// 9000-9999   | Dev/Debug    | Debug panels, dev tools
+// ──────────────────────────────────────────────────────────────────────────────
+
+$z-index-background: -1;
+$z-index-base: 0;
+$z-index-focus-indicator: 10;
+$z-index-modal: 1000;
+$z-index-persistent-ui: 2000;
+$z-index-loading-screen: 2100;
+$z-index-loading-spinner: 2101;
+$z-index-checkout-modal: 2200;
+$z-index-debug: 9000;
+$z-index-rebrand-modal: 9999;
+$base-width: 1920;
+$base-height: 1080;
+
+@function scale($px, $context: $base-height) {
+    @return calc(#{$px} * (100vh / #{$context}));
+}
+
+@function scale-clamped($min, $preferred, $max, $context: $base-height) {
+    @return clamp(
+        #{$min}px,
+        calc(#{$preferred} * (100vh / #{$context})),
+        #{$max}px
+    );
+}
+
+// Flexbox gap fallbacks for dinosaur Chrome compatibility
+// Chrome 68 falsely reports gap support but doesn't actually support it for flexbox
+
+// Use this mixin instead of gap property for horizontal spacing
+@mixin flex-gap-horizontal($gap) {
+    > *:not(:last-child) {
+        margin-right: $gap;
+    }
+}
+
+// Use this mixin instead of gap property for vertical spacing
+@mixin flex-gap-vertical($gap) {
+    > *:not(:last-child) {
+        margin-bottom: $gap;
+    }
+}
+
+// Use this mixin for bidirectional gap (both horizontal and vertical)
+@mixin flex-gap-both($gap) {
+    > * {
+        margin-right: $gap;
+        margin-bottom: $gap;
+    }
+
+    > *:last-child {
+        margin-right: 0;
+        margin-bottom: 0;
+    }
+}

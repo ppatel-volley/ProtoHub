@@ -1,0 +1,50 @@
+.supportLink {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #8a8a9c;
+    font-size: 18px;
+    font-weight: 700;
+    font-feature-settings:
+        'liga' off,
+        'clig' off;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    z-index: 1;
+}
+
+.supportLink:hover {
+    opacity: 0.8;
+}
+
+.compact {
+    font-size: 14px;
+    font-weight: 400;
+    margin-top: -8px;
+}
+
+.left {
+    text-align: left;
+    font-family: "Weekend Repro", sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    gap: 10px;
+}
+
+.needHelp {
+    color: #f3f4f1;
+    font-family: "Weekend Repro", sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.44;
+}
+
+.contactUs {
+    color: #ade0eb;
+    font-family: "Weekend Repro", sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.2;
+    border-bottom: 1px solid #ade0eb;
+}

@@ -1,0 +1,163 @@
+name: Functional Tests
+
+on:
+    pull_request:
+        branches: [main]
+    merge_group:
+        types: [checks_requested]
+    workflow_dispatch:
+
+env:
+    TEST_TIMEOUT: 15000
+    CLIENT_BASE_URL: http://localhost:4173/hub/
+    SERVER_BASE_URL: http://localhost:3000
+    PLAYWRIGHT_WORKERS: 4
+    TESTS_PER_SHARD: 15
+
+jobs:
+    set-matrix:
+        runs-on: ubuntu-latest
+        outputs:
+            shards: ${{ steps.set-shards.outputs.shards }}
+            shard_count: ${{ steps.set-shards.outputs.shard_count }}
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Calculate shards dynamically
+              id: set-shards
+              run: |
+                  cd apps/client
+
+                  # Count total number of test() calls in functional tests
+                  TEST_COUNT=$(grep -r "test(" test/functional/ | wc -l | tr -d ' ')
+                  echo "Found ${TEST_COUNT} tests"
+
+                  # Calculate number of shards (at least 1, max 3)
+                  TESTS_PER_SHARD=${{ env.TESTS_PER_SHARD }}
+                  SHARD_COUNT=$(( (TEST_COUNT + TESTS_PER_SHARD - 1) / TESTS_PER_SHARD ))
+
+                  # Clamp between 1 and 3
+                  if [ $SHARD_COUNT -lt 1 ]; then SHARD_COUNT=1; fi
+                  if [ $SHARD_COUNT -gt 3 ]; then SHARD_COUNT=3; fi
+
+                  echo "Calculated ${SHARD_COUNT} shards (${TESTS_PER_SHARD} tests per shard)"
+
+                  SHARDS=$(seq 1 $SHARD_COUNT | jq -R . | jq -s -c .)
+                  echo "shards=$SHARDS" >> $GITHUB_OUTPUT
+                  echo "shard_count=$SHARD_COUNT" >> $GITHUB_OUTPUT
+    functional-tests:
+        timeout-minutes: 15
+        runs-on: ubuntu-latest
+        needs: set-matrix
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: ${{ fromJSON(needs.set-matrix.outputs.shards) }}
+        env:
+            TOTAL_SHARDS: ${{ needs.set-matrix.outputs.shard_count }}
+        # services:
+        #     redis:
+        #         image: redis
+        #         ports:
+        #             - 6379:6379
+        #         options: >-
+        #             --health-cmd "redis-cli ping"
+        #             --health-interval 10s
+        #             --health-timeout 5s
+        #             --health-retries 5
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cache/ms-playwright
+                      apps/client/node_modules/.cache/playwright
+                  key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-playwright-
+
+            - name: Install Playwright Browsers
+              run: |
+                  cd apps/client && pnpm exec playwright install --with-deps chromium
+
+            - name: Install xvfb
+              run: sudo apt-get update && sudo apt-get install -y xvfb
+
+            - name: Build production bundle
+              run: |
+                  cd apps/client
+                  ENVIRONMENT=dev pnpm build
+              env:
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            - name: Start preview server
+              run: |
+                  cd apps/client
+                  pnpm preview &
+                  for i in {1..30}; do
+                      if curl --silent --fail "$CLIENT_BASE_URL" > /dev/null; then
+                          echo "Preview server is up!"
+                          break
+                      fi
+                      echo "Waiting for preview server to start... ($i/30)"
+                      sleep 1
+                  done
+                  if ! curl --silent --fail "$CLIENT_BASE_URL" > /dev/null; then
+                      echo "Preview server did not start within 30 seconds."
+                      exit 1
+                  fi
+
+            # - name: Run server functional tests
+            #   run: |
+            #       cd apps/server
+            #       pnpm exec playwright test --timeout=10000
+            #   env:
+            #       TEST_BASE_URL: http://localhost:3000
+            #       REDIS_HOST: localhost
+            #       REDIS_PORT: 6379
+
+            - name: Run client functional tests
+              run: |
+                  cd apps/client
+                  echo "Running shard ${{ matrix.shard }} of ${TOTAL_SHARDS}"
+                  xvfb-run --auto-servernum pnpm test:functional:nobuild --shard=${{ matrix.shard }}/${TOTAL_SHARDS}
+              env:
+                  TEST_BASE_URL: ${{ env.CLIENT_BASE_URL }}
+
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: playwright-report-${{ matrix.shard }}
+                  path: |
+                      apps/client/playwright-report/
+                  retention-days: 7
+
+    functional-tests-complete:
+        runs-on: ubuntu-latest
+        needs: functional-tests
+        if: always()
+        steps:
+            - name: Check test results
+              run: |
+                  if [[ "${{ needs.functional-tests.result }}" == "failure" ]]; then
+                      echo "Functional tests failed"
+                      exit 1
+                  elif [[ "${{ needs.functional-tests.result }}" == "cancelled" ]]; then
+                      echo "Functional tests were cancelled"
+                      exit 1
+                  else
+                      echo "All functional tests completed successfully"
+                  fi

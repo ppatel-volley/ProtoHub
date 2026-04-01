@@ -1,0 +1,108 @@
+@use "../../../Variables.scss" as *;
+
+.debug {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    top: 1vh;
+    left: 1vh;
+    color: #fff;
+    font-size: 2vh;
+    font-family: Gilroy, sans-serif;
+    font-weight: bold;
+    z-index: $z-index-debug;
+
+    .version {
+        position: fixed;
+        bottom: 1vh;
+        right: 1vh;
+    }
+
+    .phase {
+        position: fixed;
+        top: 1vh;
+        right: 1vh;
+        color: #fff;
+    }
+
+    .trackInformation {
+        position: fixed;
+        bottom: 1vh;
+        left: 1vh;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+    }
+
+    .konamiSection {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        margin-top: 1em;
+    }
+
+    .konamiTitle {
+        font-size: 1.6vh;
+        color: #888;
+        margin-bottom: 0.5em;
+        font-weight: normal;
+    }
+
+    .konamiCode {
+        display: flex;
+        gap: 0.5em;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .konamiKey {
+        color: #666;
+        font-size: 1.8vh;
+        font-family: monospace;
+        padding: 0.2em 0.4em;
+        border-radius: 0.2em;
+        background: rgb(102 102 102 / 10%);
+        transition: all 0.2s ease;
+
+        &.complete {
+            color: #ffd700;
+            background: rgb(255 215 0 / 20%);
+        }
+
+        &.active {
+            color: #fff;
+            background: rgb(255 255 255 / 20%);
+            animation: pulse 0.8s ease-in-out infinite;
+        }
+    }
+
+    .konamiPrompt {
+        color: #ffd700;
+        font-size: 1.8vh;
+        margin-left: 1em;
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.6;
+        }
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+}

@@ -1,0 +1,747 @@
+name: Deploy Client
+run-name: "Deploy Client v${{ inputs.version }} → ${{ inputs.environment }}"
+
+permissions:
+    contents: read
+    pull-requests: read
+
+on:
+    workflow_call:
+        inputs:
+            version:
+                required: true
+                type: string
+            environment:
+                required: true
+                type: string
+        secrets:
+            NPM_TOKEN:
+                required: true
+            TV_GAMES_CI_AWS_ACCESS_KEY_ID:
+                required: true
+            TV_GAMES_CI_AWS_SECRET_ACCESS_KEY:
+                required: true
+            SLACK_BOT_TOKEN:
+                required: true
+            OPENAI_API_KEY:
+                required: true
+            DATADOG_API_KEY:
+                required: true
+    workflow_dispatch:
+        inputs:
+            version:
+                description: "Version to deploy"
+                required: true
+                type: string
+            environment:
+                description: "Environment to deploy to"
+                required: true
+                type: choice
+                options:
+                    - dev
+                    - staging
+                    - production
+
+jobs:
+    validate-version:
+        runs-on: ubuntu-latest
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        steps:
+            - name: Checkout for validation
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Validate version tag exists
+              run: |
+                  if ! git tag -l | grep -q "^v${{ inputs.version }}$"; then
+                    echo "❌ Version tag 'v${{ inputs.version }}' does not exist"
+                    echo ""
+                    echo "Available recent tags:"
+                    git tag -l --sort=-version:refname | head -10
+                    echo ""
+                    echo "💡 Make sure you've created a release for version ${{ inputs.version }} first"
+                    exit 1
+                  fi
+                  echo "✅ Version tag 'v${{ inputs.version }}' exists"
+
+    check-tag:
+        runs-on: ubuntu-latest
+        outputs:
+            is_beta: ${{ steps.check_tag.outputs.is_beta }}
+        steps:
+            - name: Check if beta tag
+              id: check_tag
+              run: |
+                  if [[ "${{ github.ref }}" == refs/tags/v*-beta* ]]; then
+                    echo "is_beta=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "is_beta=false" >> $GITHUB_OUTPUT
+                  fi
+
+    promote-to-dev:
+        if: ${{ github.event_name == 'workflow_call' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev') }}
+        needs: [check-tag]
+        runs-on: ubuntu-latest
+        environment: dev-client
+        concurrency:
+            group: client_dev_environment
+            cancel-in-progress: true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: v${{ inputs.version }}
+                  lfs: true
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Extract Platform SDK version
+              id: sdk_version
+              run: |
+                  SDK_VERSION=$(node -p "require('./apps/client/package.json').dependencies['@volley/platform-sdk']")
+                  echo "version=$SDK_VERSION" >> $GITHUB_OUTPUT
+                  echo "Platform SDK version: $SDK_VERSION"
+
+            - name: Build Client
+              env:
+                  VITE_BACKEND_SERVER_ENDPOINT: "https://hub-dev-temp.volley-services.net"
+                  VITE_AMPLITUDE_EXPERIMENT_KEY: "client-YWqgSE0zE4POEO137ZSw2J9XkmNO6QYL"
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: |
+                  cd apps/client
+                  pnpm build
+
+            - name: Upload Source Maps to Datadog
+              env:
+                  DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+              run: |
+                  cd apps/client
+                  pnpm run upload:sourcemaps
+
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.TV_GAMES_CI_AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.TV_GAMES_CI_AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Build Environment Config
+              uses: ./.github/actions/create-environment-config
+              with:
+                  environment: dev
+                  backend-server-endpoint: "https://hub-dev-temp.volley-services.net"
+                  amplitude-experiment-key: "client-YWqgSE0zE4POEO137ZSw2J9XkmNO6QYL"
+                  segment-write-key: "GplqCvL1EzLnZNpAHYGqObnDzrAtgoAS"
+                  datadog-application-id: "ecb2cc5c-e9e7-4b5a-84db-5a30226cf47b"
+                  datadog-client-token: "puba0d4f79e1c746beb2eb899c779858f08"
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Upload Build Artifacts to S3
+              run: |
+                  aws s3 sync ./apps/client/dist s3://volley-game-clients-dev/hub-artifacts/${{ inputs.version }}/ --delete
+
+            - name: Deploy to S3
+              run: |
+                  aws s3 sync ./apps/client/dist s3://volley-game-clients-dev/hub/ --delete
+
+            - name: Invalidate CloudFront distribution
+              run: |
+                  aws cloudfront create-invalidation --distribution-id E2J3SFLNXWGAJZ --paths "/hub/*"
+
+            - name: Notify Slack
+              uses: ./.github/actions/client-release-outcome-slack-notification
+              with:
+                  slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+                  openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+                  environment: dev
+                  version: ${{ inputs.version }}
+                  sdk-version: ${{ steps.sdk_version.outputs.version }}
+                  repository: ${{ github.repository }}
+                  status: success
+                  triggerer: ${{ github.actor }}
+
+            - name: Notify Slack on Failure
+              if: failure()
+              uses: ./.github/actions/client-release-outcome-slack-notification
+              with:
+                  slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+                  openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+                  environment: dev
+                  version: ${{ inputs.version }}
+                  sdk-version: ${{ steps.sdk_version.outputs.version }}
+                  repository: ${{ github.repository }}
+                  status: failure
+                  triggerer: ${{ github.actor }}
+
+    promote-to-staging:
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'staging' }}
+        needs: [check-tag, validate-version]
+        runs-on: ubuntu-latest
+        environment: staging-client
+        concurrency:
+            group: client_staging_environment
+            cancel-in-progress: true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: v${{ inputs.version }}
+                  fetch-depth: 0
+
+            - name: Extract Platform SDK version
+              id: sdk_version
+              run: |
+                  SDK_VERSION=$(node -p "require('./apps/client/package.json').dependencies['@volley/platform-sdk']")
+                  echo "version=$SDK_VERSION" >> $GITHUB_OUTPUT
+                  echo "Platform SDK version: $SDK_VERSION"
+
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.TV_GAMES_CI_AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.TV_GAMES_CI_AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Get Previous Version
+              id: get_previous_version
+              run: |
+                  PREVIOUS_VERSION=$(aws s3 cp s3://volley-game-clients-staging/hub/config.js - 2>/dev/null | grep -o '"version": "[^"]*"' | cut -d'"' -f4 || echo "")
+                  echo "previous_version=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
+                  echo "Previous version: $PREVIOUS_VERSION"
+
+            - name: Download Build Artifacts from S3
+              run: |
+                  mkdir -p ./apps/client/dist
+                  aws s3 sync s3://volley-game-clients-dev/hub-artifacts/${{ inputs.version }}/ ./apps/client/dist
+                  if [ ! "$(ls -A ./apps/client/dist)" ]; then
+                    echo "❌ No build artifacts found for version ${{ inputs.version }}"
+                    echo "Make sure you have deployed to dev first to create the artifacts"
+                    exit 1
+                  fi
+                  echo "✅ Successfully downloaded build artifacts for version ${{ inputs.version }}"
+
+                  # Debug: Show what files we downloaded
+                  echo "Downloaded files:"
+                  find ./apps/client/dist -type f -name "*.js" | head -10
+
+                  # Debug: Show what's referenced in HTML
+                  echo "JS files referenced in HTML:"
+                  grep -o 'assets/[^"]*\.js' ./apps/client/dist/index.html || echo "No JS references found in HTML"
+
+            - name: Build Environment Config
+              uses: ./.github/actions/create-environment-config
+              with:
+                  environment: staging
+                  backend-server-endpoint: "https://hub-staging-temp.volley-services.net"
+                  amplitude-experiment-key: "client-YWqgSE0zE4POEO137ZSw2J9XkmNO6QYL"
+                  segment-write-key: "GplqCvL1EzLnZNpAHYGqObnDzrAtgoAS"
+                  datadog-application-id: "ecb2cc5c-e9e7-4b5a-84db-5a30226cf47b"
+                  datadog-client-token: "puba0d4f79e1c746beb2eb899c779858f08"
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Deploy to S3
+              run: |
+                  # Function to get content-type based on file extension
+                  # Returns empty string for unknown file types to let S3 handle them
+                  get_content_type() {
+                    case "${1##*.}" in
+                      js) echo "application/javascript" ;;
+                      css) echo "text/css" ;;
+                      html) echo "text/html" ;;
+                      json) echo "application/json" ;;
+                      png) echo "image/png" ;;
+                      jpg|jpeg) echo "image/jpeg" ;;
+                      gif) echo "image/gif" ;;
+                      svg) echo "image/svg+xml" ;;
+                      webp) echo "image/webp" ;;
+                      mp4) echo "video/mp4" ;;
+                      webm) echo "video/webm" ;;
+                      woff) echo "font/woff" ;;
+                      woff2) echo "font/woff2" ;;
+                      ttf) echo "font/ttf" ;;
+                      otf) echo "font/otf" ;;
+                      *) echo "" ;;
+                    esac
+                  }
+
+                  # Upload all non-HTML files with long-term cache control and proper MIME types
+                  find ./apps/client/dist ! -name "*.html" -type f | while read file; do
+                    key="hub/${file#./apps/client/dist/}"
+                    content_type=$(get_content_type "$file")
+                    if [ -n "$content_type" ]; then
+                      echo "Uploading cacheable asset $file as $key with content-type $content_type"
+                      aws s3 cp "$file" "s3://volley-game-clients-staging/$key" \
+                        --content-type "$content_type" \
+                        --cache-control "public, max-age=31536000, immutable"
+                    else
+                      echo "Uploading cacheable asset $file as $key (no explicit content-type)"
+                      aws s3 cp "$file" "s3://volley-game-clients-staging/$key" \
+                        --cache-control "public, max-age=31536000, immutable"
+                    fi
+                  done
+
+                  # Upload HTML files with no cache and proper MIME type
+                  find ./apps/client/dist -name "*.html" -type f | while read file; do
+                    key="hub/${file#./apps/client/dist/}"
+                    echo "Uploading HTML file $file as $key (no cache)"
+                    aws s3 cp "$file" "s3://volley-game-clients-staging/$key" \
+                      --content-type "text/html" \
+                      --cache-control "public, max-age=0, must-revalidate"
+                  done
+
+                  # Verify the JS files referenced in HTML exist and have correct MIME type
+                  echo "Verifying JS files referenced in HTML:"
+                  grep -o 'assets/[^"]*\.js' ./apps/client/dist/index.html | while read jsfile; do
+                    echo "Checking MIME type of $jsfile:"
+                    aws s3api head-object --bucket volley-game-clients-staging --key "hub/$jsfile" --query 'ContentType' || echo "File $jsfile not found"
+                  done
+
+            - name: Invalidate CloudFront distribution
+              run: |
+                  aws cloudfront create-invalidation --distribution-id E1TCN7PY0864XD --paths "/hub/*"
+
+            - name: Update Linear tickets
+              continue-on-error: true
+              env:
+                  VERSION: ${{ inputs.version }}
+                  LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+                  SOURCE_STATE: "Merged"
+                  TARGET_STATE: "Staging"
+                  TEAM_KEY: "HUB"
+                  PREVIOUS_VERSION: ${{ steps.get_previous_version.outputs.previous_version }}
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  npx tsx scripts/update-linear-tickets.ts
+
+            - name: Notify Slack
+              uses: ./.github/actions/client-release-outcome-slack-notification
+              with:
+                  slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+                  openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+                  environment: staging
+                  version: ${{ inputs.version }}
+                  previous-version: ${{ steps.get_previous_version.outputs.previous_version }}
+                  sdk-version: ${{ steps.sdk_version.outputs.version }}
+                  repository: ${{ github.repository }}
+                  status: success
+                  triggerer: ${{ github.actor }}
+
+            - name: Notify Slack on Failure
+              if: failure()
+              uses: ./.github/actions/client-release-outcome-slack-notification
+              with:
+                  slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+                  openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+                  environment: staging
+                  version: ${{ inputs.version }}
+                  previous-version: ${{ steps.get_previous_version.outputs.previous_version }}
+                  sdk-version: ${{ steps.sdk_version.outputs.version }}
+                  repository: ${{ github.repository }}
+                  status: failure
+                  triggerer: ${{ github.actor }}
+
+    run-staging-functional-tests:
+        if: ${{ inputs.environment == 'staging' }}
+        needs: [promote-to-staging]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Generate GitHub App Token for Orchestrator
+              id: generate-orchestrator-token
+              uses: actions/create-github-app-token@v1
+              with:
+                  app-id: ${{ secrets.VOLLEY_WORKFLOW_TRIGGER_APP_ID }}
+                  private-key: ${{ secrets.VOLLEY_WORKFLOW_TRIGGER_PRIVATE_KEY }}
+                  owner: Volley-Inc
+                  repositories: workflow-dispatch-orchestrator
+
+            - name: Trigger and Monitor Orchestrator
+              env:
+                  GH_TOKEN: ${{ steps.generate-orchestrator-token.outputs.token }}
+              run: |
+                  echo "🚀 Triggering orchestrator for Hub staging deploy..."
+
+                  # Get runs before triggering
+                  BEFORE_RUNS=$(gh run list \
+                    --repo Volley-Inc/workflow-dispatch-orchestrator \
+                    --workflow=orchestrate.yml \
+                    --limit 5 \
+                    --json databaseId \
+                    --jq '[.[].databaseId]' || echo "[]")
+
+                  echo "Existing runs: $BEFORE_RUNS"
+
+                  # Trigger orchestrator
+                  gh workflow run orchestrate.yml \
+                    --repo Volley-Inc/workflow-dispatch-orchestrator \
+                    --ref main \
+                    --field service=hub \
+                    --field version=${{ inputs.version }} \
+                    --field triggerer=${{ github.actor }} \
+                    --field wait=true
+
+                  echo "⏳ Waiting for orchestrator run to appear..."
+                  MAX_ATTEMPTS=30
+                  ATTEMPT=0
+                  RUN_ID=""
+
+                  while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+                    sleep 2
+                    ATTEMPT=$((ATTEMPT + 1))
+                    
+                    LATEST_RUN=$(gh run list \
+                      --repo Volley-Inc/workflow-dispatch-orchestrator \
+                      --workflow=orchestrate.yml \
+                      --limit 1 \
+                      --json databaseId \
+                      --jq '.[0].databaseId // ""' 2>/dev/null || echo "")
+                    
+                    if [ -n "$LATEST_RUN" ] && [ "$LATEST_RUN" != "null" ]; then
+                      # Check if this is a new run
+                      if [ "$BEFORE_RUNS" == "[]" ]; then
+                        # No previous runs, this must be our new run
+                        RUN_ID=$LATEST_RUN
+                        echo "✅ Found orchestrator run: $RUN_ID"
+                        break
+                      elif ! echo "$BEFORE_RUNS" | jq -e --argjson id "$LATEST_RUN" 'index($id) != null' > /dev/null 2>&1; then
+                        RUN_ID=$LATEST_RUN
+                        echo "✅ Found orchestrator run: $RUN_ID"
+                        break
+                      fi
+                    fi
+                    
+                    echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Waiting for new run..."
+                  done
+
+                  if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
+                    echo "❌ Could not find orchestrator run after $MAX_ATTEMPTS attempts"
+                    exit 1
+                  fi
+
+                  echo "📊 Monitoring orchestrator: https://github.com/Volley-Inc/workflow-dispatch-orchestrator/actions/runs/$RUN_ID"
+
+                  # Watch the orchestrator run (no --exit-status, we check outputs instead)
+                  gh run watch $RUN_ID --repo Volley-Inc/workflow-dispatch-orchestrator
+
+                  echo ""
+                  echo "============================================"
+                  echo "Orchestrator Results"
+                  echo "============================================"
+
+                  # Get the orchestrator outputs by parsing the logs from wait-for-results job
+                  echo "🔍 Fetching outputs from orchestrator logs..."
+
+                  # Get logs from the wait-for-results job
+                  LOGS=$(gh run view $RUN_ID --repo Volley-Inc/workflow-dispatch-orchestrator --log)
+
+                  # Extract the DEBUG output lines that contain our JSON arrays
+                  PASSED_JSON=$(echo "$LOGS" | grep "DEBUG: passed_tests=" | tail -1 | sed 's/.*DEBUG: passed_tests=//' || echo "[]")
+                  FAILED_JSON=$(echo "$LOGS" | grep "DEBUG: failed_tests=" | tail -1 | sed 's/.*DEBUG: failed_tests=//' || echo "[]")
+
+                  echo "DEBUG: passed_tests = $PASSED_JSON"
+                  echo "DEBUG: failed_tests = $FAILED_JSON"
+
+                  # Display results
+                  PASSED_COUNT=$(echo "$PASSED_JSON" | jq 'length')
+                  FAILED_COUNT=$(echo "$FAILED_JSON" | jq 'length')
+
+                  if [ "$PASSED_COUNT" -gt 0 ]; then
+                    echo "✅ Passed ($PASSED_COUNT):"
+                    echo "$PASSED_JSON" | jq -r '.[]' | sed 's/^/  - /'
+                  fi
+
+                  if [ "$FAILED_COUNT" -gt 0 ]; then
+                    echo "❌ Failed ($FAILED_COUNT):"
+                    echo "$FAILED_JSON" | jq -r '.[]' | sed 's/^/  - /'
+                  fi
+
+                  echo ""
+                  echo "============================================"
+
+                  # Check if any tests failed based on the outputs
+                  if [ "$FAILED_COUNT" -gt 0 ]; then
+                    echo "❌ Some functional tests FAILED"
+                    echo "View details: https://github.com/Volley-Inc/workflow-dispatch-orchestrator/actions/runs/$RUN_ID"
+                    exit 1
+                  else
+                    echo "✅ All functional tests PASSED"
+                  fi
+
+    check-beta-packages:
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'production' }}
+        needs: [validate-version]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check for beta version tag
+              run: |
+                  VERSION_LOWER=$(echo "${{ inputs.version }}" | tr '[:upper:]' '[:lower:]')
+                  if [[ "$VERSION_LOWER" == *beta* ]]; then
+                    echo "BETA_VERSION=v${{ inputs.version }}" >> $GITHUB_ENV
+                    echo "HAS_BETA=true" >> $GITHUB_ENV
+                  else
+                    echo "HAS_BETA=false" >> $GITHUB_ENV
+                  fi
+
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: v${{ inputs.version }}
+
+            - name: Check for beta dependency versions
+              id: beta_check
+              run: |
+                  BETA_DEPS=""
+
+                  # Check all package.json files in the monorepo
+                  for pkg in package.json apps/client/package.json apps/server/package.json; do
+                    if [ -f "$pkg" ]; then
+                      # Extract all dependency versions containing "beta"
+                      FOUND=$(node -e "
+                        const pkg = require('./$pkg');
+                        const sections = ['dependencies'];
+                        sections.forEach(s => {
+                          if (pkg[s]) {
+                            Object.entries(pkg[s]).forEach(([name, version]) => {
+                              if (/beta/i.test(version)) {
+                                console.log('  • ' + name + '@' + version + ' (' + '$pkg' + ')');
+                              }
+                            });
+                          }
+                        });
+                      ")
+                      if [ -n "$FOUND" ]; then
+                        BETA_DEPS="${BETA_DEPS}${FOUND}\n"
+                      fi
+                    fi
+                  done
+
+                  # Also flag if the release version itself is beta
+                  if [ "$HAS_BETA" = "true" ]; then
+                    BETA_DEPS="  • Hub version: ${BETA_VERSION}\n${BETA_DEPS}"
+                  fi
+
+                  if [ -n "$BETA_DEPS" ]; then
+                    echo "has_beta=true" >> $GITHUB_OUTPUT
+                    # JSON-escape for safe interpolation into Slack payload
+                    ESCAPED_DEPS=$(echo -e "$BETA_DEPS" | jq -Rs . | sed 's/^"//;s/"$//')
+                    echo "beta_deps=$ESCAPED_DEPS" >> $GITHUB_OUTPUT
+                    echo "❌ Beta packages detected in production deploy:"
+                    echo -e "$BETA_DEPS"
+                  else
+                    echo "has_beta=false" >> $GITHUB_OUTPUT
+                    echo "✅ No beta packages found"
+                  fi
+
+            - name: Alert Slack about beta packages
+              if: ${{ steps.beta_check.outputs.has_beta == 'true' }}
+              uses: slackapi/slack-github-action@v1.24.0
+              with:
+                  channel-id: 'hub-releases'
+                  payload: |
+                      {
+                        "text": "",
+                        "blocks": [
+                          {
+                            "type": "section",
+                            "text": {
+                              "type": "mrkdwn",
+                              "text": ":hubfret: *Production deploy blocked* — beta packages detected in v${{ inputs.version }}"
+                            }
+                          },
+                          {
+                            "type": "section",
+                            "text": {
+                              "type": "mrkdwn",
+                              "text": "*Beta packages found:*\n${{ steps.beta_check.outputs.beta_deps }}"
+                            }
+                          },
+                          {
+                            "type": "context",
+                            "elements": [
+                              {
+                                "type": "mrkdwn",
+                                "text": "Triggered by ${{ github.actor }} • <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+              env:
+                  SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+            - name: Fail if beta packages found
+              if: ${{ steps.beta_check.outputs.has_beta == 'true' }}
+              run: |
+                  echo "❌ Cannot deploy to production with beta packages"
+                  echo "Please update all packages to stable versions before deploying to production."
+                  exit 1
+
+    promote-to-production:
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'production' }}
+        needs: [check-tag, validate-version, check-beta-packages]
+        runs-on: ubuntu-latest
+        environment: production-client
+        concurrency:
+            group: client_production_environment
+            cancel-in-progress: true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: v${{ inputs.version }}
+                  fetch-depth: 0
+
+            - name: Extract Platform SDK version
+              id: sdk_version
+              run: |
+                  SDK_VERSION=$(node -p "require('./apps/client/package.json').dependencies['@volley/platform-sdk']")
+                  echo "version=$SDK_VERSION" >> $GITHUB_OUTPUT
+                  echo "Platform SDK version: $SDK_VERSION"
+
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.TV_GAMES_CI_AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.TV_GAMES_CI_AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Get Previous Version
+              id: get_previous_version
+              run: |
+                  PREVIOUS_VERSION=$(aws s3 cp s3://volley-game-clients-production/hub/config.js - 2>/dev/null | grep -o '"version": "[^"]*"' | cut -d'"' -f4 || echo "")
+                  echo "previous_version=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
+                  echo "Previous version: $PREVIOUS_VERSION"
+
+            - name: Download Build Artifacts from S3
+              run: |
+                  mkdir -p ./apps/client/dist
+                  aws s3 sync s3://volley-game-clients-dev/hub-artifacts/${{ inputs.version }}/ ./apps/client/dist
+                  if [ ! "$(ls -A ./apps/client/dist)" ]; then
+                    echo "❌ No build artifacts found for version ${{ inputs.version }}"
+                    echo "Make sure you have deployed to dev first to create the artifacts"
+                    exit 1
+                  fi
+                  echo "✅ Successfully downloaded build artifacts for version ${{ inputs.version }}"
+
+                  # Debug: Show what files we downloaded
+                  echo "Downloaded files:"
+                  find ./apps/client/dist -type f -name "*.js" | head -10
+
+                  # Debug: Show what's referenced in HTML
+                  echo "JS files referenced in HTML:"
+                  grep -o 'assets/[^"]*\.js' ./apps/client/dist/index.html || echo "No JS references found in HTML"
+
+            - name: Build Environment Config
+              uses: ./.github/actions/create-environment-config
+              with:
+                  environment: production
+                  backend-server-endpoint: "https://hub-production-temp.volley-services.net"
+                  amplitude-experiment-key: "client-069F9nLAP5Eu4lYI4bS7FbFrA3JKHXtT"
+                  segment-write-key: "rPAy696cVxRbwQ6qaGVOyWotdI3jGYAJ"
+                  datadog-application-id: "ecb2cc5c-e9e7-4b5a-84db-5a30226cf47b"
+                  datadog-client-token: "puba0d4f79e1c746beb2eb899c779858f08"
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Deploy to S3
+              run: |
+                  # Function to get content-type based on file extension
+                  # Returns empty string for unknown file types to let S3 handle them
+                  get_content_type() {
+                    case "${1##*.}" in
+                      js) echo "application/javascript" ;;
+                      css) echo "text/css" ;;
+                      html) echo "text/html" ;;
+                      json) echo "application/json" ;;
+                      png) echo "image/png" ;;
+                      jpg|jpeg) echo "image/jpeg" ;;
+                      gif) echo "image/gif" ;;
+                      svg) echo "image/svg+xml" ;;
+                      webp) echo "image/webp" ;;
+                      mp4) echo "video/mp4" ;;
+                      webm) echo "video/webm" ;;
+                      woff) echo "font/woff" ;;
+                      woff2) echo "font/woff2" ;;
+                      ttf) echo "font/ttf" ;;
+                      otf) echo "font/otf" ;;
+                      *) echo "" ;;
+                    esac
+                  }
+
+                  # Upload all non-HTML files with long-term cache control and proper MIME types
+                  find ./apps/client/dist ! -name "*.html" -type f | while read file; do
+                    key="hub/${file#./apps/client/dist/}"
+                    content_type=$(get_content_type "$file")
+                    if [ -n "$content_type" ]; then
+                      echo "Uploading cacheable asset $file as $key with content-type $content_type"
+                      aws s3 cp "$file" "s3://volley-game-clients-production/$key" \
+                        --content-type "$content_type" \
+                        --cache-control "public, max-age=31536000, immutable"
+                    else
+                      echo "Uploading cacheable asset $file as $key (no explicit content-type)"
+                      aws s3 cp "$file" "s3://volley-game-clients-production/$key" \
+                        --cache-control "public, max-age=31536000, immutable"
+                    fi
+                  done
+
+                  # Upload HTML files with no cache and proper MIME type
+                  find ./apps/client/dist -name "*.html" -type f | while read file; do
+                    key="hub/${file#./apps/client/dist/}"
+                    echo "Uploading HTML file $file as $key (no cache)"
+                    aws s3 cp "$file" "s3://volley-game-clients-production/$key" \
+                      --content-type "text/html" \
+                      --cache-control "public, max-age=0, must-revalidate"
+                  done
+
+                  # Verify the JS files referenced in HTML exist and have correct MIME type
+                  echo "Verifying JS files referenced in HTML:"
+                  grep -o 'assets/[^"]*\.js' ./apps/client/dist/index.html | while read jsfile; do
+                    echo "Checking MIME type of $jsfile:"
+                    aws s3api head-object --bucket volley-game-clients-production --key "hub/$jsfile" --query 'ContentType' || echo "File $jsfile not found"
+                  done
+
+            - name: Invalidate CloudFront distribution
+              run: |
+                  aws cloudfront create-invalidation --distribution-id E1QS5FBLCVKA80 --paths "/hub/*"
+
+            - name: Update Linear tickets
+              continue-on-error: true
+              env:
+                  VERSION: ${{ inputs.version }}
+                  LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+                  SOURCE_STATE: "Ready for Prod"
+                  TARGET_STATE: "Production"
+                  TEAM_KEY: "HUB"
+                  PREVIOUS_VERSION: ${{ steps.get_previous_version.outputs.previous_version }}
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  npx tsx scripts/update-linear-tickets.ts
+
+            - name: Notify Slack
+              uses: ./.github/actions/client-release-outcome-slack-notification
+              with:
+                  slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+                  openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+                  environment: production
+                  version: ${{ inputs.version }}
+                  previous-version: ${{ steps.get_previous_version.outputs.previous_version }}
+                  sdk-version: ${{ steps.sdk_version.outputs.version }}
+                  repository: ${{ github.repository }}
+                  status: success
+                  triggerer: ${{ github.actor }}
+
+            - name: Notify Slack on Failure
+              if: failure()
+              uses: ./.github/actions/client-release-outcome-slack-notification
+              with:
+                  slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+                  openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+                  environment: production
+                  version: ${{ inputs.version }}
+                  previous-version: ${{ steps.get_previous_version.outputs.previous_version }}
+                  sdk-version: ${{ steps.sdk_version.outputs.version }}
+                  repository: ${{ github.repository }}
+                  status: failure
+                  triggerer: ${{ github.actor }}

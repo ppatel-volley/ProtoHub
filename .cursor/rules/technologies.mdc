@@ -1,0 +1,36 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Technologies
+
+This document outlines the key technologies used in the Hub project.
+
+## Frontend (Client)
+
+- **Framework**: React 19
+- **Build Tool**: Vite 6
+- **Language**: TypeScript 5.7
+- **Styling**: SASS
+- **Testing**: Jest, React Testing Library
+- **Navigation**: Norigin Spatial Navigation
+
+## Backend (Server)
+
+- **Runtime**: Node.js 22+
+- **Framework**: Express.js
+- **Language**: TypeScript
+- **Build Tool**: esbuild
+- **Database**: Redis (via ioredis)
+
+## Voice & Gaming Integration
+
+- **Volley Platform SDK**: Voice gaming platform integration
+
+## Development Tools
+
+- **Linting**: ESLint 9+
+- **Formatting**: Prettier
+- **Versioning**: semantic-release
+- **Commit Linting**: commitlint

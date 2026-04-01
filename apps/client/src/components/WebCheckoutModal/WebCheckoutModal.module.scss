@@ -1,0 +1,456 @@
+@use "../../Variables.scss" as *;
+
+.modal {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: $z-index-checkout-modal;
+    display: flex;
+    justify-content: flex-start;
+    aspect-ratio: 16/9;
+    width: auto;
+    height: 100vh;
+    max-width: 100vw;
+    left: 50vw;
+    transform: translateX(-50vw);
+    background: var(--Color-Modal-Background, #0e0319);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition:
+        opacity 300ms ease-out,
+        transform 300ms ease-out;
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        pointer-events: none;
+        z-index: 1;
+        transform: scaleX(0.625);
+        transform-origin: left center;
+    }
+}
+
+.modalHidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50vw) scale(0.95);
+}
+
+.modalVisible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50vw) scale(1);
+}
+
+.backgroundVideo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    z-index: 0;
+    transition:
+        opacity 300ms ease-out,
+        visibility 300ms ease-out;
+}
+
+.backgroundVideoHidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.backgroundVideoVisible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.content {
+  padding: scale(60) scale(138) 0;
+  max-width: 100vw;
+    width: 100vw;
+    color: var(--Color-Text-Primary, white);
+    position: relative;
+    z-index: 2;
+    overflow: visible;
+    background: var(
+        --Color-Modal-Content-Gradient,
+        linear-gradient(
+            90deg,
+            rgb(20 4 36) 0%,
+            rgb(20 4 36) 28%,
+            rgb(20 4 36 / 0%) 62%,
+            rgb(20 4 36 / 0%) 100%
+        )
+    );
+}
+
+
+.mainHeading {
+    font-size: scale(66);
+    width: scale(975);
+    font-weight: 600;
+    line-height: 1.2;
+    margin-top: scale(100);
+    font-family: Gilroy, Roboto, sans-serif;
+    white-space: pre-wrap;
+}
+
+.subtitle {
+    font-size: scale(32);
+    width: scale(720);
+    height: scale(90);
+    line-height: 1.2;
+    margin: 0;
+    font-weight: 100;
+    font-family: Gilroy, Roboto, sans-serif;
+    color: var(--Color-Text-Secondary, #9a9ab1);
+}
+
+.qrSectionContainer {
+    position: absolute;
+    bottom: 0;
+    z-index: 1;
+    height: scale(560);
+}
+
+.qrSection {
+    margin: 0 0 0 scale(-6);
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    @include flex-gap-horizontal(scale(64));
+}
+
+.rim {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    padding: scale(6);
+    width: scale(480);
+    height: scale(480);
+    border-radius: scale(48);
+    background: radial-gradient(
+        circle,
+        var(--Color-Brand-Primary, #ffec37) 0%,
+        var(--Color-Brand-Rim-End, #b42eec) 50%
+    );
+    background-size: 200% 200%;
+    animation: rimming 4.8s linear infinite;
+}
+
+.paymentQrContent {
+    position: absolute;
+    left: scale(1.6);
+    top: scale(1.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: -1;
+    border-radius: 0;
+    overflow: hidden;
+    padding: scale(14);
+    width: scale(448);
+    height: scale(448);
+}
+
+.rimSuccess {
+    background: #34c759;
+    animation: none;
+}
+
+@keyframes rimming {
+    0% {
+        background-position: 0 0;
+    }
+
+    25% {
+        background-position: 100% 0;
+    }
+
+    50% {
+        background-position: 100% 100%;
+    }
+
+    75% {
+        background-position: 0 100%;
+    }
+
+    100% {
+        background-position: 0 0;
+    }
+}
+
+.qrCodeBox {
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: center;
+    align-items: center;
+    border-radius: scale(48);
+    background-color: white;
+    border: scale(8) solid #000;
+    position: relative;
+    overflow: hidden;
+}
+
+.paymentQrContentSuccess {
+    background-color: white;
+    border-radius: scale(16);
+}
+
+.paymentQrWrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    transition: none;
+}
+
+.paymentQrFadeOut {
+    animation: paymentQrFadeOut 400ms linear forwards;
+}
+
+@keyframes paymentQrFadeOut {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+.modalFadeOut {
+    animation: paymentModalFadeOut 400ms linear forwards;
+}
+
+@keyframes paymentModalFadeOut {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+.scanIndicatorAnimationContainer {
+    margin-bottom: scale(130);
+    animation-name: scanIndicatorReveal, scanIndicatorBounce;
+    animation-duration: 600ms, 5500ms;
+    animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1), ease;
+    animation-delay: 600ms, 600ms;
+    animation-iteration-count: 1, infinite;
+    animation-fill-mode: forwards, none;
+    opacity: 0;
+}
+
+.scanIndicator {
+    width: scale(342);
+    height: scale(112);
+    display: block;
+}
+
+@keyframes scanIndicatorReveal {
+    0% {
+        transform: translateX(-96px);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes scanIndicatorBounce {
+    60% {
+        transform: translateX(0);
+    }
+
+    65.6% {
+        transform: translateX(-12px);
+    }
+
+    80% {
+        transform: translateX(0);
+    }
+
+    85.6% {
+        transform: translateX(-12px);
+    }
+
+    100% {
+        transform: translateX(0);
+    }
+}
+
+.activationText {
+    font-size: scale(32);
+    margin: scale(40) 0 0;
+
+    .highlight {
+        color: #0A0322;
+        font-weight: 600;
+        background-color: #ECECDB;
+        padding: scale(8) scale(16);
+        border-radius: scale(16);
+        display: inline-block;
+        margin: 0 scale(4);
+    }
+
+    font-family: Gilroy, Roboto, sans-serif;
+}
+
+.bottomShadow {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    height: scale(465);
+    background: linear-gradient(
+        180deg,
+        rgb(0 0 0 / 0%) 0%,
+        rgb(0 0 0 / 65%) 68.36%,
+        #000 100%
+    );
+}
+
+.backHint {
+    position: absolute;
+    bottom: scale(64);
+    left: scale(1300);
+    width: scale(500);
+    color: var(--Color-Text-Primary);
+    font-size: scale(28);
+    font-family: Gilroy, Roboto, sans-serif;
+    font-weight: 600;
+    text-align: right;
+    line-height: 1.4;
+    word-wrap: break-word;
+    white-space: normal;
+    z-index: 10;
+}
+
+@media (max-width: scale(1200)) {
+    .content {
+        padding: scale(60);
+        max-width: 60vw;
+    }
+
+    .mainHeading {
+        width: scale(500);
+        height: scale(120);
+    }
+
+    .subtitle {
+        width: scale(500);
+        height: scale(60);
+    }
+
+    .activationText {
+        font-size: scale(16);
+    }
+}
+
+@media (max-width: scale(768)) {
+    .content {
+        padding: scale(40);
+        max-width: 80vw;
+    }
+
+    .mainHeading {
+        width: scale(400);
+        height: scale(100);
+    }
+
+    .subtitle {
+        width: scale(400);
+        height: scale(50);
+    }
+
+    .activationText {
+        font-size: scale(16);
+    }
+
+    .rim {
+        transform: scale(0.8);
+    }
+
+    .scanIndicator {
+        transform: scale(0.8);
+    }
+
+    .qrSection {
+        @include flex-gap-horizontal(scale(16));
+    }
+}
+
+.qrHighlight {
+    animation: qrHighlightAnim 2s;
+}
+
+@keyframes qrHighlightAnim {
+    0% {
+        transform: translate3d(0, 0, 0);
+    }
+
+    30% {
+        transform: translate3d(0, -50px, 0) matrix(1.1, 0, 0, 1.1, 0, 0);
+    }
+
+    40% {
+        transform: translate3d(0, -50px, 0) rotate(1deg) matrix(1.1, 0, 0, 1.1, 0, 0);
+    }
+
+    50% {
+        transform: translate3d(0, -50px, 0) rotate(-1deg) matrix(1.1, 0, 0, 1.1, 0, 0);
+    }
+
+    60% {
+        transform: translate3d(0, -50px, 0) rotate(1deg) matrix(1.1, 0, 0, 1.1, 0, 0);
+    }
+
+    70% {
+        transform: translate3d(0, -50px, 0) rotate(-1deg) matrix(1.1, 0, 0, 1.1, 0, 0);
+    }
+
+    100% {
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+.refreshingCode {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.refreshingSpinner {
+    width: scale(64);
+    height: scale(64);
+    border: scale(6) solid #f3f3f3;
+    border-top: scale(6) solid #666;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}

@@ -1,0 +1,128 @@
+name: Create Release
+
+permissions:
+    contents: write
+    packages: write
+    pull-requests: read
+
+concurrency:
+    group: create-release-${{ github.ref }}
+    cancel-in-progress: false
+
+on:
+    workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - "apps/client/**"
+            - "apps/server/**"
+            - "packages/**"
+
+jobs:
+    create-release:
+        # Only run if the commit message doesn't already contain release information to prevent infinite loops
+        if: ${{ !contains(github.event.head_commit.message, 'chore(release):') }}
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.release.outputs.version }}
+            release_commit: ${{ steps.release.outputs.release_commit }}
+            should_continue: ${{ steps.check-commits.outputs.should_continue }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  ssh-key: ${{ secrets.SSH_DEPLOY_KEY }}
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Configure Git
+              run: |
+                  git config --global user.name "GitHub Actions"
+                  git config --global user.email "github-actions@github.com"
+
+            - name: Check for relevant commits
+              id: check-commits
+              run: |
+                  # Run semantic-release in dry-run mode and capture its output
+                  RELEASE_OUTPUT=$(pnpm pre-release)
+
+                  # Check if the output indicates no release would be created
+                  if echo "$RELEASE_OUTPUT" | grep -q "There are no relevant changes"; then
+                    echo "There are no relevant changes"
+                    echo "should_continue=false" >> $GITHUB_OUTPUT
+                    exit 0
+                  fi
+
+                  # If we get here, there are relevant commits
+                  echo "Found relevant commits for release"
+                  echo "should_continue=true" >> $GITHUB_OUTPUT
+
+            - name: Sync with remote
+              if: steps.check-commits.outputs.should_continue == 'true'
+              run: |
+                  git fetch origin main
+                  NEW_COMMITS=$(git log HEAD..origin/main --pretty=%s)
+                  if [ -n "$NEW_COMMITS" ]; then
+                    # Fail if any new commit is not a release commit
+                    if echo "$NEW_COMMITS" | grep -qv '^chore(release'; then
+                      echo "::error::Unexpected non-release commits on main:"
+                      echo "$NEW_COMMITS"
+                      exit 1
+                    fi
+                    git rebase origin/main
+                  fi
+
+            - name: Release
+              if: steps.check-commits.outputs.should_continue == 'true'
+              id: release
+              run: |
+                  pnpm release
+                  # Get version from package.json and ensure it's not empty
+                  VERSION=$(node -p "require('./package.json').version")
+                  echo "Debug: Raw version from package.json: $VERSION"
+                  if [ -z "$VERSION" ]; then
+                    echo "Error: Version is empty"
+                    exit 1
+                  fi
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+                  echo "Debug: Set version output to: $VERSION"
+                  # Get the latest commit hash after release
+                  echo "release_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+            - name: Wait for release commit
+              run: |
+                  # Wait for the release commit to be available
+                  sleep 10
+                  git fetch origin
+                  git checkout ${{ steps.release.outputs.release_commit }}
+
+    deploy-client:
+        needs: create-release
+        if: needs.create-release.outputs.should_continue == 'true'
+        uses: ./.github/workflows/deploy-client.yml
+        with:
+            version: ${{ needs.create-release.outputs.version }}
+            environment: dev
+        secrets:
+            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+            TV_GAMES_CI_AWS_ACCESS_KEY_ID: ${{ secrets.TV_GAMES_CI_AWS_ACCESS_KEY_ID }}
+            TV_GAMES_CI_AWS_SECRET_ACCESS_KEY: ${{ secrets.TV_GAMES_CI_AWS_SECRET_ACCESS_KEY }}
+            SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+            DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+
+    # deploy-server:
+    #     needs: create-release
+    #     if: needs.create-release.outputs.should_continue == 'true'
+    #     uses: ./.github/workflows/deploy-server.yml
+    #     with:
+    #         version: ${{ needs.create-release.outputs.version }}
+    #         release_commit: ${{ needs.create-release.outputs.release_commit }}
+    #     secrets:
+    #         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    #         AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+    #         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

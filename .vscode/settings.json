@@ -1,0 +1,99 @@
+{
+    /* Git */
+
+    "git.enableSmartCommit": true,
+    "git.autofetch": true,
+
+    /* Editor */
+
+    "editor.tabSize": 4,
+    "editor.wordWrap": "wordWrapColumn",
+    "editor.wordWrapColumn": 100,
+    "editor.fontLigatures": true,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+    "editor.linkedEditing": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll": "explicit",
+        "source.fixAll.eslint": "explicit",
+        "source.addMissingImports": "explicit"
+    },
+
+    /* Search */
+
+    "search.exclude": {
+        "**/track_cache.json": true
+    },
+
+    /* ESLint */
+
+    "eslint.enable": true,
+    "eslint.useFlatConfig": true,
+    "eslint.options": {
+        "overrideConfigFile": "eslint.config.mjs"
+    },
+    "eslint.validate": ["typescript", "typescriptreact"],
+    "eslint.workingDirectories": [{ "mode": "auto" }],
+
+    /* Language Specific */
+
+    "typescript.preferences.importModuleSpecifier": "relative",
+    "typescript.preferences.renameMatchingJsxTags": true,
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    "typescript.suggestionActions.enabled": false,
+    "javascript.preferences.importModuleSpecifier": "relative",
+    "javascript.preferences.renameMatchingJsxTags": true,
+    "javascript.updateImportsOnFileMove.enabled": "always",
+    "javascript.suggestionActions.enabled": false,
+
+    "[github-actions-workflow]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+
+    "[jsonc]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+
+    "[scss]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+
+    /* Misc. */
+
+    "files.associations": {
+        "*.json": "jsonc"
+    },
+
+    /* TypeScript Barrel Generator */
+
+    "exportall.config.semis": false,
+    "exportall.config.quote": "\"",
+    "cSpell.words": ["VITE"],
+    "workbench.colorCustomizations": {
+        "activityBar.activeBackground": "#782507",
+        "activityBar.background": "#782507",
+        "activityBar.foreground": "#e7e7e7",
+        "activityBar.inactiveForeground": "#e7e7e799",
+        "activityBarBadge.background": "#000000",
+        "activityBarBadge.foreground": "#e7e7e7",
+        "commandCenter.border": "#e7e7e799",
+        "sash.hoverBorder": "#782507",
+        "statusBar.background": "#481604",
+        "statusBar.foreground": "#e7e7e7",
+        "statusBarItem.hoverBackground": "#782507",
+        "statusBarItem.remoteBackground": "#481604",
+        "statusBarItem.remoteForeground": "#e7e7e7",
+        "titleBar.activeBackground": "#481604",
+        "titleBar.activeForeground": "#e7e7e7",
+        "titleBar.inactiveBackground": "#48160499",
+        "titleBar.inactiveForeground": "#e7e7e799"
+    },
+    "peacock.color": "#481604",
+    "[typescript]": {
+        "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
+    }
+}

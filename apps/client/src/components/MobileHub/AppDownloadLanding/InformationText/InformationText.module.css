@@ -1,0 +1,40 @@
+.text {
+    width: 240px;
+    color: #fff;
+    text-align: center;
+    font-feature-settings:
+        'liga' off,
+        'clig' off;
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+    margin: 0;
+    margin-bottom: 18px;
+}
+
+.left {
+    width: 100%;
+    color: #b3b1b5;
+    text-align: left;
+    font-family: "Weekend Repro", sans-serif;
+    font-size: 16px;
+    line-height: 1.44;
+    margin-bottom: 0;
+    overflow-wrap: break-word;
+}
+
+@media screen and (min-width: 500px) {
+    .text {
+        width: 486px;
+        font-size: 22px;
+        font-weight: 400;
+        margin-bottom: 20px;
+    }
+
+    .left {
+        width: 100%;
+        font-size: 16px;
+        margin-bottom: 0;
+    }
+}

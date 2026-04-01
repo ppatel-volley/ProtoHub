@@ -1,0 +1,41 @@
+@use "../../Variables.scss" as *;
+
+.successCheckmark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.checkmarkInner {
+    width: scale(88);
+    height: scale(88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: scaleX(0.375) scaleY(0.375);
+    opacity: 0;
+}
+
+.checkmarkInner.animate {
+    animation: paymentCheckmarkAppear 1800ms cubic-bezier(0.34, 1.56, 0.64, 1)
+        forwards;
+}
+
+// Actual animation is 800ms (44.4% of 1800ms) so we get a 1s delay before onAnimationEnd fires
+@keyframes paymentCheckmarkAppear {
+    0% {
+        transform: scaleX(0.375) scaleY(0.375);
+        opacity: 0;
+    }
+
+    44.4% {
+        transform: scaleX(1) scaleY(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scaleX(1) scaleY(1);
+        opacity: 1;
+    }
+}

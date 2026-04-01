@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/volley-favicon.png" />
+  <!-- 
+    Viewport meta tag configuration:
+    - width=device-width: Sets viewport width to device width
+    - initial-scale=1.0: Sets initial zoom level to 100%
+    - viewport-fit=cover: Extends content to fill the entire screen (handles notches/cutouts)
+    - user-scalable=no: Prevents users from zooming/scaling the page
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <title>Volley</title>
+  <script>
+    if (typeof queueMicrotask !== "function") {
+      console.log("Applying queueMicrotask polyfill for older TV OS");
+      window.queueMicrotask = function(callback) {
+        Promise.resolve()
+          .then(callback)
+          .catch(function(error) {
+            setTimeout(function() { throw error; }, 0);
+          });
+      };
+    }
+    
+    if (!Promise.allSettled) {
+      console.log("Applying Promise.allSettled polyfill for older TV OS");
+      Promise.allSettled = function(promises) {
+        return Promise.all(promises.map(function(promise) {
+          return Promise.resolve(promise).then(
+            function(value) {
+              return { status: 'fulfilled', value: value };
+            },
+            function(reason) {
+              return { status: 'rejected', reason: reason };
+            }
+          );
+        }));
+      };
+    }
+    
+    if (!("FinalizationRegistry" in window)) {
+      console.log("Applying FinalizationRegistry polyfill for older TV OS");
+      window.FinalizationRegistry = class FinalizationRegistryPolyfill {
+        constructor(callback) {
+          this.callback = callback;
+        }
+        
+        register(_target, _heldValue, _unregisterToken) {
+          // No-op: we can't actually track object finalization without native support
+          // Rive will work without this, just without automatic cleanup
+        }
+        
+        unregister(_unregisterToken) {
+          // No-op: return false to indicate the token wasn't found
+          return false;
+        }
+      };
+    }
+    
+    
+    if (!("WeakRef" in window)) {
+      console.log("Applying WeakRef polyfill for older TV OS");
+      window.WeakRef = class WeakRefPolyfill {
+        constructor(target) {
+          this._target = target;
+        }
+        
+        deref() {
+          return this._target;
+        }
+      };
+    }
+  </script>
+</head>
+
+<body style="background-color: #010020;overflow: hidden;">
+  <div id="root"></div>
+  <script src="/config.js"></script>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>

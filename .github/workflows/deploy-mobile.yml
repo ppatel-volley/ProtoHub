@@ -1,0 +1,343 @@
+name: Deploy Mobile
+run-name: "Deploy Mobile v${{ inputs.version }} → ${{ inputs.environment }}"
+
+permissions:
+    contents: read
+    pull-requests: read
+
+on:
+    workflow_call:
+        inputs:
+            version:
+                required: true
+                type: string
+            environment:
+                required: true
+                type: string
+        secrets:
+            NPM_TOKEN:
+                required: true
+            TV_GAMES_CI_AWS_ACCESS_KEY_ID:
+                required: true
+            TV_GAMES_CI_AWS_SECRET_ACCESS_KEY:
+                required: true
+            SLACK_BOT_TOKEN:
+                required: true
+            OPENAI_API_KEY:
+                required: true
+            DATADOG_API_KEY:
+                required: true
+    workflow_dispatch:
+        inputs:
+            version:
+                description: "Version to deploy"
+                required: true
+                type: string
+            environment:
+                description: "Environment to deploy to"
+                required: true
+                type: choice
+                options:
+                    - dev
+                    - staging
+                    - production
+
+jobs:
+    validate-version:
+        runs-on: ubuntu-latest
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        steps:
+            - name: Checkout for validation
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Validate version tag exists
+              run: |
+                  if ! git tag -l | grep -q "^mobile-v${{ inputs.version }}$"; then
+                    echo "❌ Version tag 'mobile-v${{ inputs.version }}' does not exist"
+                    echo ""
+                    echo "Available recent mobile tags:"
+                    git tag -l 'mobile-v*' --sort=-version:refname | head -10
+                    echo ""
+                    echo "💡 Make sure you've created a release for version ${{ inputs.version }} first"
+                    exit 1
+                  fi
+                  echo "✅ Version tag 'mobile-v${{ inputs.version }}' exists"
+
+    promote-to-dev:
+        if: ${{ github.event_name == 'workflow_call' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev') }}
+        runs-on: ubuntu-latest
+        environment: dev-mobile
+        concurrency:
+            group: mobile_dev_environment
+            cancel-in-progress: true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: mobile-v${{ inputs.version }}
+                  lfs: true
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Build Mobile
+              env:
+                  VITE_BACKEND_SERVER_ENDPOINT: "https://hub-dev-temp.volley-services.net"
+                  VITE_AMPLITUDE_EXPERIMENT_KEY: "client-YWqgSE0zE4POEO137ZSw2J9XkmNO6QYL"
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: |
+                  cd apps/mobile
+                  pnpm build
+
+            - name: Upload Source Maps to Datadog
+              env:
+                  DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+              run: |
+                  cd apps/mobile
+                  pnpm run upload:sourcemaps
+
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.TV_GAMES_CI_AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.TV_GAMES_CI_AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Build Environment Config
+              uses: ./.github/actions/create-environment-config
+              with:
+                  environment: dev
+                  backend-server-endpoint: "https://hub-dev-temp.volley-services.net"
+                  amplitude-experiment-key: "client-YWqgSE0zE4POEO137ZSw2J9XkmNO6QYL"
+                  segment-write-key: "GplqCvL1EzLnZNpAHYGqObnDzrAtgoAS"
+                  datadog-application-id: "64006289-3e44-4ff7-a53a-7a3b2c0f4dfa"
+                  datadog-client-token: "pube482df09a4ecefe8814037941e7acaaa"
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+                  app-path: apps/mobile
+
+            - name: Upload Build Artifacts to S3
+              run: |
+                  aws s3 sync ./apps/mobile/dist s3://volley-game-clients-dev/mobile-artifacts/${{ inputs.version }}/ --delete
+
+            - name: Deploy to S3
+              run: |
+                  aws s3 sync ./apps/mobile/dist s3://volley-game-clients-dev/mobile/ --delete
+
+            - name: Invalidate CloudFront distribution
+              run: |
+                  aws cloudfront create-invalidation --distribution-id E2J3SFLNXWGAJZ --paths "/mobile/*"
+
+    promote-to-staging:
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'staging' }}
+        needs: [validate-version]
+        runs-on: ubuntu-latest
+        environment: staging-mobile
+        concurrency:
+            group: mobile_staging_environment
+            cancel-in-progress: true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: mobile-v${{ inputs.version }}
+                  fetch-depth: 0
+                  lfs: true
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Build Mobile
+              env:
+                  VITE_BACKEND_SERVER_ENDPOINT: "https://hub-staging-temp.volley-services.net"
+                  VITE_AMPLITUDE_EXPERIMENT_KEY: "client-YWqgSE0zE4POEO137ZSw2J9XkmNO6QYL"
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: |
+                  cd apps/mobile
+                  pnpm build
+
+            - name: Upload Source Maps to Datadog
+              env:
+                  DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+              run: |
+                  cd apps/mobile
+                  pnpm run upload:sourcemaps
+
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.TV_GAMES_CI_AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.TV_GAMES_CI_AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Build Environment Config
+              uses: ./.github/actions/create-environment-config
+              with:
+                  environment: staging
+                  backend-server-endpoint: "https://hub-staging-temp.volley-services.net"
+                  amplitude-experiment-key: "client-YWqgSE0zE4POEO137ZSw2J9XkmNO6QYL"
+                  segment-write-key: "GplqCvL1EzLnZNpAHYGqObnDzrAtgoAS"
+                  datadog-application-id: "64006289-3e44-4ff7-a53a-7a3b2c0f4dfa"
+                  datadog-client-token: "pube482df09a4ecefe8814037941e7acaaa"
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+                  app-path: apps/mobile
+
+            - name: Upload Build Artifacts to S3
+              run: |
+                  aws s3 sync ./apps/mobile/dist s3://volley-game-clients-staging/mobile-artifacts/${{ inputs.version }}/ --delete
+
+            - name: Deploy to S3
+              run: |
+                  # Function to get content-type based on file extension
+                  get_content_type() {
+                    case "${1##*.}" in
+                      js) echo "application/javascript" ;;
+                      css) echo "text/css" ;;
+                      html) echo "text/html" ;;
+                      json) echo "application/json" ;;
+                      png) echo "image/png" ;;
+                      jpg|jpeg) echo "image/jpeg" ;;
+                      gif) echo "image/gif" ;;
+                      svg) echo "image/svg+xml" ;;
+                      webp) echo "image/webp" ;;
+                      mp4) echo "video/mp4" ;;
+                      webm) echo "video/webm" ;;
+                      woff) echo "font/woff" ;;
+                      woff2) echo "font/woff2" ;;
+                      ttf) echo "font/ttf" ;;
+                      otf) echo "font/otf" ;;
+                      *) echo "" ;;
+                    esac
+                  }
+
+                  # Upload all non-HTML files with long-term cache control and proper MIME types
+                  find ./apps/mobile/dist ! -name "*.html" -type f | while read file; do
+                    key="mobile/${file#./apps/mobile/dist/}"
+                    content_type=$(get_content_type "$file")
+                    if [ -n "$content_type" ]; then
+                      echo "Uploading cacheable asset $file as $key with content-type $content_type"
+                      aws s3 cp "$file" "s3://volley-game-clients-staging/$key" \
+                        --content-type "$content_type" \
+                        --cache-control "public, max-age=31536000, immutable"
+                    else
+                      echo "Uploading cacheable asset $file as $key (no explicit content-type)"
+                      aws s3 cp "$file" "s3://volley-game-clients-staging/$key" \
+                        --cache-control "public, max-age=31536000, immutable"
+                    fi
+                  done
+
+                  # Upload HTML files with no cache and proper MIME type
+                  find ./apps/mobile/dist -name "*.html" -type f | while read file; do
+                    key="mobile/${file#./apps/mobile/dist/}"
+                    echo "Uploading HTML file $file as $key (no cache)"
+                    aws s3 cp "$file" "s3://volley-game-clients-staging/$key" \
+                      --content-type "text/html" \
+                      --cache-control "public, max-age=0, must-revalidate"
+                  done
+
+            - name: Invalidate CloudFront distribution
+              run: |
+                  aws cloudfront create-invalidation --distribution-id E1TCN7PY0864XD --paths "/mobile/*"
+
+    promote-to-production:
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'production' }}
+        needs: [validate-version]
+        runs-on: ubuntu-latest
+        environment: production-mobile
+        concurrency:
+            group: mobile_production_environment
+            cancel-in-progress: true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: mobile-v${{ inputs.version }}
+                  fetch-depth: 0
+
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.TV_GAMES_CI_AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.TV_GAMES_CI_AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Download Build Artifacts from Staging
+              run: |
+                  mkdir -p ./apps/mobile/dist
+                  aws s3 sync s3://volley-game-clients-staging/mobile-artifacts/${{ inputs.version }}/ ./apps/mobile/dist
+                  if [ ! "$(ls -A ./apps/mobile/dist)" ]; then
+                    echo "❌ No build artifacts found for version ${{ inputs.version }}"
+                    echo "Make sure you have deployed to staging first to create the artifacts"
+                    exit 1
+                  fi
+                  echo "✅ Successfully downloaded build artifacts for version ${{ inputs.version }}"
+
+            - name: Build Environment Config
+              uses: ./.github/actions/create-environment-config
+              with:
+                  environment: production
+                  backend-server-endpoint: "https://hub-production-temp.volley-services.net"
+                  amplitude-experiment-key: "client-069F9nLAP5Eu4lYI4bS7FbFrA3JKHXtT"
+                  segment-write-key: "rPAy696cVxRbwQ6qaGVOyWotdI3jGYAJ"
+                  datadog-application-id: "64006289-3e44-4ff7-a53a-7a3b2c0f4dfa"
+                  datadog-client-token: "pube482df09a4ecefe8814037941e7acaaa"
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+                  app-path: apps/mobile
+
+            - name: Deploy to S3
+              run: |
+                  # Function to get content-type based on file extension
+                  get_content_type() {
+                    case "${1##*.}" in
+                      js) echo "application/javascript" ;;
+                      css) echo "text/css" ;;
+                      html) echo "text/html" ;;
+                      json) echo "application/json" ;;
+                      png) echo "image/png" ;;
+                      jpg|jpeg) echo "image/jpeg" ;;
+                      gif) echo "image/gif" ;;
+                      svg) echo "image/svg+xml" ;;
+                      webp) echo "image/webp" ;;
+                      mp4) echo "video/mp4" ;;
+                      webm) echo "video/webm" ;;
+                      woff) echo "font/woff" ;;
+                      woff2) echo "font/woff2" ;;
+                      ttf) echo "font/ttf" ;;
+                      otf) echo "font/otf" ;;
+                      *) echo "" ;;
+                    esac
+                  }
+
+                  # Upload all non-HTML files with long-term cache control and proper MIME types
+                  find ./apps/mobile/dist ! -name "*.html" -type f | while read file; do
+                    key="mobile/${file#./apps/mobile/dist/}"
+                    content_type=$(get_content_type "$file")
+                    if [ -n "$content_type" ]; then
+                      echo "Uploading cacheable asset $file as $key with content-type $content_type"
+                      aws s3 cp "$file" "s3://volley-game-clients-production/$key" \
+                        --content-type "$content_type" \
+                        --cache-control "public, max-age=31536000, immutable"
+                    else
+                      echo "Uploading cacheable asset $file as $key (no explicit content-type)"
+                      aws s3 cp "$file" "s3://volley-game-clients-production/$key" \
+                        --cache-control "public, max-age=31536000, immutable"
+                    fi
+                  done
+
+                  # Upload HTML files with no cache and proper MIME type
+                  find ./apps/mobile/dist -name "*.html" -type f | while read file; do
+                    key="mobile/${file#./apps/mobile/dist/}"
+                    echo "Uploading HTML file $file as $key (no cache)"
+                    aws s3 cp "$file" "s3://volley-game-clients-production/$key" \
+                      --content-type "text/html" \
+                      --cache-control "public, max-age=0, must-revalidate"
+                  done
+
+            - name: Invalidate CloudFront distribution
+              run: |
+                  aws cloudfront create-invalidation --distribution-id E1QS5FBLCVKA80 --paths "/mobile/*"

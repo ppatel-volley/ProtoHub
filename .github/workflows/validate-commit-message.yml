@@ -1,0 +1,38 @@
+name: Validate Commit Message
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  validate-commit-message:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Need at least 2 commits to get the merge commit
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-environment
+        with:
+          npm-token: ${{ secrets.NPM_TOKEN }}
+
+      - name: Validate Commit Message
+        run: |
+          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            # Validate the merge commit message
+            # Strip "(via username): " prefix that GitHub adds in merge queue
+            COMMIT_MSG=$(git log -1 --pretty=%B | sed 's/^(via [^)]*): //')
+            echo "Commit message:"
+            echo "$COMMIT_MSG"
+            echo "$COMMIT_MSG" | npx commitlint
+          else
+            # Validate PR title for non-merge-queue events
+            echo "${{ github.event.pull_request.title }}" | npx commitlint
+          fi

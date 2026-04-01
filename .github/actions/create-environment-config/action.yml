@@ -1,0 +1,101 @@
+name: "Build Environment config"
+description: "Builds the environment config for the client"
+
+inputs:
+  environment:
+    description: 'Deployment environment (staging/production)'
+    required: true
+    default: 'staging'
+    type: choice
+    options:
+      - local
+      - dev
+      - staging
+      - production
+
+  backend-server-endpoint:
+    description: 'Endpoint of deployed backend'
+    required: true
+    default: "https://hub-dev-temp.volley-services.net"
+    type: string
+
+  amplitude-experiment-key:
+    description: 'Deployment API key for Amplitude Experiment service'
+    required: true
+    default: "client-YWqgSE0zE4POEO137ZSw2J9XkmNO6QYL"
+    type: string
+
+  volley-logo-display-millis:
+    description: 'Duration of the logo display in milliseconds'
+    required: true
+    default: "2000"
+    type: string
+
+  segment-write-key:
+    description: 'Segment write key'
+    required: true
+    default: "GplqCvL1EzLnZNpAHYGqObnDzrAtgoAS"
+    type: string
+
+  datadog-application-id:
+    description: 'Datadog application ID'
+    required: true
+    default: "ecb2cc5c-e9e7-4b5a-84db-5a30226cf47b"
+    type: string
+
+  datadog-client-token:
+    description: 'Datadog client token'
+    required: true
+    default: "puba0d4f79e1c746beb2eb899c779858f08"
+    type: string
+
+  npm-token:
+    description: "NPM token"
+    required: true
+
+  app-path:
+    description: "Path to the app directory containing the build:env-config script"
+    required: false
+    default: "apps/client"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        run_install: false
+
+    - name: Configure pnpm for private packages
+      run: |
+        echo "@volley:registry=https://registry.npmjs.org/" >> ~/.npmrc
+        echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+      shell: bash
+      env:
+        NPM_TOKEN: ${{ inputs.npm-token }}
+
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        pnpm install
+      env:
+        NPM_TOKEN: ${{ inputs.npm-token }}
+
+    - name: Build Environment Config
+      shell: bash
+      run: |
+        cd ${{ inputs.app-path }}
+        pnpm build:env-config
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        BACKEND_SERVER_ENDPOINT: ${{ inputs.backend-server-endpoint }}
+        AMPLITUDE_EXPERIMENT_KEY: ${{ inputs.amplitude-experiment-key }}
+        VOLLEY_LOGO_DISPLAY_MILLIS: ${{ inputs.volley-logo-display-millis }}
+        SEGMENT_WRITE_KEY: ${{ inputs.segment-write-key }}
+        DATADOG_APPLICATION_ID: ${{ inputs.datadog-application-id }}
+        DATADOG_CLIENT_TOKEN: ${{ inputs.datadog-client-token }}

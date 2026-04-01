@@ -1,0 +1,26 @@
+@use "../../../Variables.scss" as *;
+
+.title {
+    color: #fff;
+    font-size: scale(52);
+    font-weight: 600;
+    margin: 0 0 scale(24);
+}
+
+.instructions {
+    color: #b3b3b3;
+    font-size: scale(32);
+    margin: 0 0 scale(16);
+    line-height: 1.4;
+}
+
+.email {
+    color: $modal-highlight-yellow;
+}
+
+.errorDetails {
+    color: #808080;
+    font-size: scale(28);
+    margin: scale(16) 0 0;
+    font-family: monospace;
+}

@@ -1,0 +1,44 @@
+:root {
+  --light-color-background: #f0f6ff;
+  --light-color-background-secondary: #dbe8fc;
+  --light-color-background-warning: #fff3cd;
+  --light-color-icon-background: var(--light-color-background);
+  --light-color-accent: #2d7fd3;
+  --light-color-active-menu-item: #2d7fd3;
+  --light-color-text: #1a3a5c;
+  --light-color-text-aside: #3a6a9e;
+  --light-color-link: #1a6bbf;
+
+  --dark-color-background: #0d1b2a;
+  --dark-color-background-secondary: #132d4a;
+  --dark-color-background-warning: #3a2e00;
+  --dark-color-icon-background: var(--dark-color-background);
+  --dark-color-accent: #5ba8e6;
+  --dark-color-active-menu-item: #5ba8e6;
+  --dark-color-text: #c8ddf0;
+  --dark-color-text-aside: #7aadda;
+  --dark-color-link: #6db8f2;
+}
+
+.tsd-page-title::before {
+  content: "";
+  display: block;
+  width: 4rem;
+  height: 4rem;
+  margin-bottom: 0.75rem;
+  background-image: url("./hubsmile.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+footer::after {
+  content: "";
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+  background-image: url("./hubsmile.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+}

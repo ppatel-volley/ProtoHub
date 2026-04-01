@@ -1,0 +1,75 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Coding Conventions
+
+This document outlines the coding conventions and best practices for the Hub project.
+
+## TypeScript
+
+- Use TypeScript for all code
+- Follow strict type checking
+- Leverage shared tsconfig configurations from `packages/tsconfig`
+- in `@hub/server` favor composition over inheritance and adhere to solid principles
+
+## Code Style
+
+- Use ESLint for code linting (configuration in `packages/eslint-config`)
+- Follow Prettier formatting rules (defined in `.prettierrc`)
+- Use 2 space indentation (as per prettier config)
+
+## Comments
+
+- **Avoid extraneous comments** - Code should be self-documenting through semantic naming and clear structure
+- Only add comments in the following cases:
+  - JSDoc for public APIs, functions, and complex types
+  - When code behavior is unexpected or goes contrary to normal expectations
+  - For necessary workarounds with explanations why they exist
+- Write code that explains itself through:
+  - Clear variable and function names
+  - Small, focused functions
+  - Descriptive type names
+
+## Architecture
+
+- Use shared packages for common code
+- common game types and utils are defined in the server and shared by the server with the client
+- all shared code is exported via `@hub/server` (maps to `./src/shared/index.ts`) and `@hub/server/types` (maps to `./src/shared/types/index.ts`)
+- namespace and expose shared packages as necessary but becareful that you are not importing unnecessary code into the client
+
+## Package Management
+
+- Use workspace references for internal dependencies (`workspace:*`)
+- External dependencies must be declared in the package that uses them
+- Define specific version numbers for all external dependencies
+
+## Commits
+
+- **Follow conventional commit format** (enforced by commitlint) - This is required to pass build checks
+- **Pull Request titles must also follow conventional commit format** - This ensures consistency and enables automated workflows
+- Use semantic versioning and semantic-release for automated releases
+- Commit types:
+  - `feat`: New features
+  - `fix`: Bug fixes
+  - `docs`: Documentation changes
+  - `style`: Code style changes (formatting, missing semicolons, etc.)
+  - `refactor`: Code refactoring without changing functionality
+  - `perf`: Performance improvements
+  - `test`: Adding or updating tests
+  - `chore`: Maintenance tasks, dependency updates, etc.
+  - `build`: Changes to build system or external dependencies
+  - `ci`: Changes to CI configuration files
+  - `revert`: Reverting previous commits
+- Format: `<type>(<scope>): <subject>`
+  - Example: `feat(server): add game state persistence`
+  - Example: `fix(client): resolve focus indicator positioning issue`
+- Breaking changes: Add `!` after the type (e.g., `feat!:`, `fix!:`)
+  - Example: `feat!: change api structure`
+  - Can also include `BREAKING CHANGE:` in the commit body for additional details
+- Pull Request title examples:
+  - `feat(client): add multiplayer game selection screen`
+  - `fix(server): resolve Redis connection timeout issue`
+  - `chore: update dependencies to latest versions`
+- The conventional commit format is used for automatic versioning with semantic-release

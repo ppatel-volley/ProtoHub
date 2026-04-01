@@ -1,0 +1,24 @@
+{
+    "extends": ["stylelint-config-standard-scss"],
+    "plugins": ["stylelint-scss"],
+    "rules": {
+        "property-no-unknown": null,
+        "scss/at-rule-no-unknown": true,
+        "declaration-property-value-disallowed-list": {
+            "z-index": ["/^-?[1-9]\\d{2,}$/"]
+        },
+        "selector-class-pattern": null,
+        "custom-property-pattern": null,
+        "scss/dollar-variable-pattern": null,
+        "keyframes-name-pattern": null,
+        "scss/at-mixin-pattern": null
+    },
+    "overrides": [
+        {
+            "files": ["**/Variables.scss"],
+            "rules": {
+                "declaration-property-value-disallowed-list": null
+            }
+        }
+    ]
+}

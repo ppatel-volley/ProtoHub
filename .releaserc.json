@@ -1,0 +1,45 @@
+{
+    "branches": ["main"],
+    "plugins": [
+        "@semantic-release/commit-analyzer",
+        "@semantic-release/release-notes-generator",
+        "@semantic-release/changelog",
+        [
+            "@semantic-release/exec",
+            {
+                "prepareCmd": "node scripts/update-versions.js ${nextRelease.version} && pnpm install && pnpm build"
+            }
+        ],
+        [
+            "@semantic-release/git",
+            {
+                "assets": [
+                    "package.json",
+                    "CHANGELOG.md",
+                    "apps/client/package.json",
+                    "apps/server/package.json",
+                    "dist/**/*"
+                ],
+                "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
+                "push": true
+            }
+        ]
+    ],
+    "preset": "angular",
+    "releaseRules": [
+        { "type": "feat", "release": "minor" },
+        { "type": "fix", "release": "patch" },
+        { "type": "docs", "release": false },
+        { "type": "style", "release": false },
+        { "type": "refactor", "release": false },
+        { "type": "perf", "release": "patch" },
+        { "type": "test", "release": false },
+        { "type": "chore", "release": false },
+        { "type": "revert", "release": "patch" },
+        { "type": "ci", "release": false },
+        { "type": "build", "release": false },
+        { "type": "security", "release": "patch" },
+        { "type": "breaking", "release": "major" }
+    ],
+    "tagFormat": "v${version}"
+}

@@ -1,0 +1,100 @@
+name: PR Statistical Analysis
+
+on:
+    pull_request:
+        types:
+            - opened
+            - synchronize
+
+permissions:
+    contents: read
+    pull-requests: write
+
+jobs:
+    stats-gate:
+        runs-on: ubuntu-latest
+        outputs:
+            run: ${{ steps.gate.outputs.run }}
+        steps:
+            - name: Gate
+              id: gate
+              env:
+                  HEAD_REF: ${{ github.head_ref }}
+                  PR_ACTION: ${{ github.event.action }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+              run: |
+                  run=false
+                  if [[ "$HEAD_REF" == "dana/pr-horoscope" ]]; then
+                    run=true
+                  elif [[ $(date +%Y%m%d) -ge 20260304 && "$PR_ACTION" != "synchronize" ]]; then
+                    [[ $(( PR_NUMBER % 5 )) -eq 0 ]] && run=true
+                  fi
+                  echo "run=$run" >> $GITHUB_OUTPUT
+
+    pr-analysis:
+        needs: stats-gate
+        if: needs.stats-gate.outputs.run == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Get PR context
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  pr_json=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}")
+                  echo "$pr_json" | jq -r '.title // ""' > pr_title.txt
+                  echo "$pr_json" | jq -r '.body // ""' | head -c 1500 > pr_body.txt
+                  echo "$pr_json" | jq -r '.head.sha' > pr_head_sha.txt
+
+                  files_json=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files")
+                  echo "$files_json" | jq -r '.[].filename' | head -50 > pr_files.txt
+                  file_count=$(echo "$files_json" | jq 'length')
+                  echo "$file_count" > pr_file_count.txt
+
+            - name: Generate analysis
+              env:
+                  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+              run: |
+                  file_count=$(cat pr_file_count.txt)
+                  tarot_idx=$(( PR_NUMBER % 22 ))
+                  iching_idx=$(( (PR_NUMBER % 64) + 1 ))
+                  rune_idx=$(( PR_NUMBER % 24 ))
+                  num_root=$(( (PR_NUMBER - 1) % 9 + 1 ))
+
+                  system='You are a PR mystic. Use ONLY these four systems with the exact indices provided. (1) Numerology: the PR digit root (1-9) and file count—give a 1-2 sentence numerological reading (e.g. life path, balance). (2) Tarot: map the given index (0-21) to the Major Arcana card (0 The Fool … 21 The World) and interpret what that card means for this PR. (3) I Ching: use the hexagram number (1-64) and give one line of wisdom for this change. (4) Runes: map the index (0-23) to Elder Futhark (Fehu through Othala) and one short phrase. Weave all four into 2-3 short paragraphs. Playful and silly, not mean. Output only the reading, no preamble.'
+                  user="Use these exact indices (derive from PR #${PR_NUMBER} and ${file_count} files):
+                  Tarot Major Arcana index (0-21): ${tarot_idx}
+                  I Ching hexagram (1-64): ${iching_idx}
+                  Rune index Elder Futhark (0-23): ${rune_idx}
+                  Numerology: PR digit root ${num_root}, file count ${file_count}
+
+                  PR title: $(cat pr_title.txt)
+                  PR body (excerpt): $(cat pr_body.txt)
+                  Files changed: $(cat pr_files.txt)
+                  Today: $(date '+%A, %B %d').
+
+                  Write the cosmic PR reading using all four systems."
+                  payload=$(jq -n \
+                    --arg sys "$system" \
+                    --arg user "$user" \
+                    '{model: "gpt-4o-mini", max_tokens: 500, temperature: 1.1, messages: [{role: "system", content: $sys}, {role: "user", content: $user}]}')
+                  resp=$(curl -sS -X POST "https://api.openai.com/v1/chat/completions" \
+                    -H "Authorization: Bearer $OPENAI_API_KEY" \
+                    -H "Content-Type: application/json" \
+                    -d "$payload")
+                  content=$(echo "$resp" | jq -r '.choices[0].message.content // "Analysis could not be generated. Try again later."')
+                  printf '%s\n\n%s' "## PR Statistical Analysis" "$content" > reading_body.txt
+
+            - name: Post review
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  body_json=$(jq -Rs . < reading_body.txt)
+                  head_sha=$(cat pr_head_sha.txt)
+                  curl -sS -X POST \
+                    -H "Authorization: Bearer $GH_TOKEN" \
+                    -H "Accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" \
+                    -d "{\"commit_id\": \"$head_sha\", \"body\": $body_json, \"event\": \"COMMENT\"}"

@@ -1,0 +1,164 @@
+name: Functional Tests on Staging
+
+on:
+    workflow_dispatch:
+        inputs:
+            debug_timeout:
+                description: "debug timeout in seconds"
+                required: false
+            upload_all_artifacts:
+                description: "upload all test artifacts? defaults to just traces."
+                type: boolean
+                default: false
+                required: false
+    repository_dispatch:
+        types:
+            - hub-client-release-staging
+
+env:
+    TEST_TIMEOUT: 15000
+    PLAYWRIGHT_WORKERS: 4
+    TESTS_PER_SHARD: 15
+
+jobs:
+    set-matrix:
+        runs-on: ubuntu-latest
+        outputs:
+            shards: ${{ steps.set-shards.outputs.shards }}
+            shard_count: ${{ steps.set-shards.outputs.shard_count }}
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Calculate shards dynamically
+              id: set-shards
+              run: |
+                  cd apps/client
+
+                  # Count total number of test() calls in functional tests
+                  TEST_COUNT=$(grep -r "test(" test/functional/ | wc -l | tr -d ' ')
+                  echo "Found ${TEST_COUNT} tests"
+
+                  # Calculate number of shards (at least 1, max 3)
+                  TESTS_PER_SHARD=${{ env.TESTS_PER_SHARD }}
+                  SHARD_COUNT=$(( (TEST_COUNT + TESTS_PER_SHARD - 1) / TESTS_PER_SHARD ))
+
+                  # Clamp between 1 and 3
+                  if [ $SHARD_COUNT -lt 1 ]; then SHARD_COUNT=1; fi
+                  if [ $SHARD_COUNT -gt 3 ]; then SHARD_COUNT=3; fi
+
+                  echo "Calculated ${SHARD_COUNT} shards (${TESTS_PER_SHARD} tests per shard)"
+
+                  SHARDS=$(seq 1 $SHARD_COUNT | jq -R . | jq -s -c .)
+                  echo "shards=$SHARDS" >> $GITHUB_OUTPUT
+                  echo "shard_count=$SHARD_COUNT" >> $GITHUB_OUTPUT
+
+    functional-tests:
+        timeout-minutes: 20
+        runs-on: shared-k8s-staging
+        needs: set-matrix
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: ${{ fromJSON(needs.set-matrix.outputs.shards) }}
+        env:
+            TOTAL_SHARDS: ${{ needs.set-matrix.outputs.shard_count }}
+        container:
+            image: mcr.microsoft.com/playwright:v1.53.0-jammy
+            options: --name hub-staging-functional-tests-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cache/ms-playwright
+                      apps/client/node_modules/.cache/playwright
+                  key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-playwright-
+
+            - name: Install Playwright Browsers
+              run: |
+                  cd apps/client && pnpm exec playwright install chromium
+
+            - name: Run client functional tests
+              run: |
+                  cd apps/client
+                  echo "Running shard ${{ matrix.shard }} of ${TOTAL_SHARDS}"
+                  pnpm exec playwright test --shard=${{ matrix.shard }}/${TOTAL_SHARDS}
+              env:
+                  TEST_BASE_URL: ${{ secrets.STAGING_HUB_URL || 'https://game-clients-staging.volley.tv/hub/' }}
+                  TEST_ENVIRONMENT: staging
+                  DEBUG: pw:api
+
+            - name: Compress Test Results
+              if: failure()
+              run: |
+                  cd apps/client
+                  if [ "${{ inputs.upload_all_artifacts }}" = "true" ]; then
+                    echo "📦 Compressing all test artifacts..."
+                    tar -czf test-results.tar.gz \
+                      playwright-report/ \
+                      test-results/ 2>/dev/null || true
+                  else
+                    echo "📦 Compressing essential test artifacts..."
+                    tar -czf test-results.tar.gz \
+                      --exclude="test-results/**/error-context.md" \
+                      --exclude="test-results/**/trace/" \
+                      --exclude="playwright-report/data/" \
+                      test-results/**/trace.zip \
+                      test-results/**/*.png \
+                      playwright-report/index.html 2>/dev/null || true
+                  fi
+                  echo "📊 Compressed artifact size:"
+                  ls -lh test-results.tar.gz || echo "No test results to compress"
+
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: playwright-report-${{ matrix.shard }}
+                  path: |
+                      apps/client/playwright-report/
+                  retention-days: 7
+
+            - uses: actions/upload-artifact@v4
+              if: failure()
+              with:
+                  name: hub-test-results-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+                  path: apps/client/test-results.tar.gz
+                  retention-days: 7
+
+            - name: Wait for Debug Timeout
+              if: always() && inputs.debug_timeout != '' && inputs.debug_timeout != '0'
+              run: |
+                  echo "⏱️ Waiting for debug timeout: ${{ inputs.debug_timeout }} seconds"
+                  sleep ${{ inputs.debug_timeout }}
+
+    functional-tests-complete:
+        runs-on: ubuntu-latest
+        needs: functional-tests
+        if: always()
+        steps:
+            - name: Check test results
+              run: |
+                  if [[ "${{ needs.functional-tests.result }}" == "failure" ]]; then
+                      echo "Functional tests failed"
+                      exit 1
+                  elif [[ "${{ needs.functional-tests.result }}" == "cancelled" ]]; then
+                      echo "Functional tests were cancelled"
+                      exit 1
+                  else
+                      echo "All functional tests completed successfully"
+                  fi

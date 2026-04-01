@@ -1,0 +1,29 @@
+.buzzer {
+    aspect-ratio: 1;
+    width: 100%;
+    max-width: 400px;
+}
+
+.buzzerContainer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(100% - 280px);
+    width: 100%;
+}
+
+.controllerContainer {
+    padding: env(safe-area-inset-top, 20px) env(safe-area-inset-right, 20px)
+        env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 20px);
+}
+
+.header {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 140px;
+    width: 100%;
+}

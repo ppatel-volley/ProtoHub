@@ -1,0 +1,52 @@
+.text {
+    width: 100%;
+    color: #fff;
+    text-align: center;
+    font-feature-settings:
+        'liga' off,
+        'clig' off;
+    font-family: var(--family-sans, Roboto, sans-serif);
+    font-size: var(--font-h2, 28px);
+    font-style: normal;
+    font-weight: var(--weight-bold, 700);
+    line-height: 130%;
+    letter-spacing: -0.4px;
+    margin: 0;
+    margin-bottom: 20px;
+}
+
+.left {
+    color: var(--Color-UI-Primary-Text, #f3f4f1);
+    text-align: left;
+    font-family: "Weekend Repro", sans-serif;
+    margin-bottom: 0;
+    overflow-wrap: break-word;
+}
+
+/* SM - Medium font size for tablets (1 line) */
+@media screen and (min-width: 655px) {
+    .text {
+        width: auto;
+        max-width: 100%;
+        line-height: 130%;
+        letter-spacing: -0.6px;
+        margin-bottom: 25px;
+    }
+
+    .left {
+        width: 100%;
+        letter-spacing: -0.4px;
+        margin-bottom: 0;
+    }
+}
+
+/* LG - Large font size for desktop when there's space */
+@media screen and (min-width: 1200px) {
+    .text {
+        letter-spacing: -0.8px;
+    }
+
+    .left {
+        letter-spacing: -0.4px;
+    }
+}

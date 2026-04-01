@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "extends": "@hub/tsconfig/react.json",
+    "compilerOptions": {
+        "baseUrl": "./",
+        "noEmit": true,
+        "moduleResolution": "bundler",
+        "module": "ESNext",
+        "outDir": "./dist",
+        "jsx": "react-jsx"
+    },
+    "include": [
+        "src/**/*",
+        "eslint.config.mjs",
+        "vite.config.ts",
+        "jest.config.ts",
+        "jest.setup.ts",
+        "playwright.config.ts",
+        "scripts/**/*.js"
+    ],
+    "exclude": ["node_modules", "dist", "test"]
+}

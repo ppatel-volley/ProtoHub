@@ -1,0 +1,271 @@
+/* Overlay backdrop */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 4, 33, 0.3);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 48px 24px;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Modal content */
+.modal {
+    position: relative;
+    width: 100%;
+    max-width: 412px;
+    max-height: calc(100vh - 96px);
+    background: #060421;
+    border-radius: 24px;
+    padding: 32px 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Close button */
+.closeButton {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: #d6d6d6;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    z-index: 1;
+}
+
+.closeButton:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.closeButton:active {
+    transform: scale(0.95);
+}
+
+/* Title - matches h2 in web-checkout */
+.title {
+    margin: 0;
+    padding: 0;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.4px;
+    color: #ffffff;
+}
+
+/* Description - matches PageTitle bodyText */
+.description {
+    margin-top: 8px;
+    margin-bottom: 8px;
+    color: #d6d6d6;
+    white-space: pre-wrap;
+    text-align: left;
+    width: 100%;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 1.44;
+}
+
+/* Form container - matches VStack with spacing="xxs" */
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Base styles for inputs and textarea - matches Input, Textarea */
+.input,
+.textarea {
+    width: 100%;
+    padding: 16px 24px;
+    border: 1px solid #7a7a7a;
+    height: 56px;
+    border-radius: 16px;
+    background: transparent;
+    color: #ffffff;
+    font-weight: 500;
+    font-size: 16px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-sizing: border-box;
+}
+
+/* Textarea specific */
+.textarea {
+    min-height: calc(56px * 3);
+    resize: vertical;
+    line-height: 1.44;
+}
+
+/* Placeholder styling */
+.input::placeholder,
+.textarea::placeholder {
+    color: #7a7a7a;
+    opacity: 1;
+}
+
+/* Focus states */
+.input:focus,
+.textarea:focus {
+    border: 2px solid #ffec37;
+    padding: calc(16px - 1px) calc(24px - 1px);
+}
+
+/* Remove autofill styling */
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover,
+.input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #060421 inset;
+    -webkit-text-fill-color: #ffffff;
+    border-color: inherit;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Actions container */
+.actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* Button base - matches Button component */
+.button {
+    font-weight: bolder;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: 0.3s;
+    box-sizing: border-box;
+    font-size: 18px;
+    border-radius: 100px;
+    width: 100%;
+    border: none;
+    max-width: 412px;
+    height: 56px;
+    padding: 16px 24px;
+}
+
+/* Primary button */
+.primaryButton {
+    background: #ffec37;
+    color: #00001f;
+}
+
+.primaryButton:hover {
+    background: #fff9c2;
+    color: #00001f;
+}
+
+.primaryButton:active {
+    background: #cdbb00;
+    color: #00001f;
+    transform: scale(80%);
+}
+
+.primaryButton:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Feedback messages */
+.feedback {
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.44;
+    margin-top: 8px;
+}
+
+.error {
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    color: #f44336;
+}
+
+.success {
+    background: rgba(50, 209, 114, 0.1);
+    border: 1px solid rgba(50, 209, 114, 0.3);
+    color: #32d172;
+}
+
+.countdown {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #d6d6d6;
+    text-align: center;
+    font-weight: 500;
+}
+
+/* Technical details */
+.context {
+    background: rgba(245, 245, 250, 0.05);
+    border: 1px solid #7a7a7a;
+    border-radius: 16px;
+    padding: 16px;
+    font-size: 14px;
+    color: #d6d6d6;
+    overflow-wrap: anywhere;
+    margin-top: 8px;
+}
+
+.contextTitle {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.context pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #d6d6d6;
+}

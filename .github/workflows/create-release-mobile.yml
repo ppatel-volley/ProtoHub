@@ -1,0 +1,125 @@
+name: Create Release (Mobile)
+
+permissions:
+    contents: write
+    packages: write
+    pull-requests: read
+
+concurrency:
+    group: create-release-${{ github.ref }}
+    cancel-in-progress: false
+
+on:
+    workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - "apps/mobile/**"
+
+jobs:
+    create-release:
+        if: ${{ !contains(github.event.head_commit.message, 'chore(release-mobile):') }}
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.release.outputs.version }}
+            release_commit: ${{ steps.release.outputs.release_commit }}
+            should_continue: ${{ steps.check-commits.outputs.should_continue }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  ssh-key: ${{ secrets.SSH_DEPLOY_KEY }}
+
+            - name: Setup Environment
+              uses: ./.github/actions/setup-environment
+              with:
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+
+            - name: Configure Git
+              run: |
+                  git config --global user.name "GitHub Actions"
+                  git config --global user.email "github-actions@github.com"
+
+            - name: Check for relevant commits
+              id: check-commits
+              run: |
+                  # Check if there are any changes to apps/mobile since the last mobile tag
+                  LAST_TAG=$(git tag -l 'mobile-v*' --sort=-version:refname | head -1)
+                  if [ -z "$LAST_TAG" ]; then
+                    echo "No previous mobile release found, proceeding"
+                    echo "should_continue=true" >> $GITHUB_OUTPUT
+                    exit 0
+                  fi
+
+                  CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ | wc -l | tr -d ' ')
+                  if [ "$CHANGES" -eq 0 ]; then
+                    echo "No changes to apps/mobile since $LAST_TAG"
+                    echo "should_continue=false" >> $GITHUB_OUTPUT
+                  else
+                    echo "Found $CHANGES changed files in apps/mobile since $LAST_TAG"
+                    echo "should_continue=true" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Bump Version and Tag
+              if: steps.check-commits.outputs.should_continue == 'true'
+              id: release
+              run: |
+                  cd apps/mobile
+
+                  # Get current version
+                  CURRENT_VERSION=$(node -p "require('./package.json').version")
+                  echo "Current version: $CURRENT_VERSION"
+
+                  # Parse version parts
+                  MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+                  MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+                  PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+
+                  # Increment patch version
+                  NEW_PATCH=$((PATCH + 1))
+                  NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+                  echo "New version: $NEW_VERSION"
+
+                  # Update package.json version
+                  node -e "
+                    const pkg = require('./package.json');
+                    pkg.version = '$NEW_VERSION';
+                    require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 4) + '\n');
+                  "
+
+                  cd ../..
+
+                  # Commit and tag
+                  git add apps/mobile/package.json
+                  git commit -m "chore(release-mobile): $NEW_VERSION [skip ci]"
+                  git fetch origin main
+                  NEW_COMMITS=$(git log HEAD~1..origin/main --pretty=%s)
+                  if [ -n "$NEW_COMMITS" ]; then
+                    if echo "$NEW_COMMITS" | grep -qv '^chore(release'; then
+                      echo "::error::Unexpected non-release commits on main:"
+                      echo "$NEW_COMMITS"
+                      exit 1
+                    fi
+                    git rebase origin/main
+                  fi
+                  git tag "mobile-v$NEW_VERSION"
+                  git push origin main --tags
+
+                  echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+                  echo "release_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+    deploy-mobile:
+        needs: create-release
+        if: needs.create-release.outputs.should_continue == 'true'
+        uses: ./.github/workflows/deploy-mobile.yml
+        with:
+            version: ${{ needs.create-release.outputs.version }}
+            environment: dev
+        secrets:
+            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+            TV_GAMES_CI_AWS_ACCESS_KEY_ID: ${{ secrets.TV_GAMES_CI_AWS_ACCESS_KEY_ID }}
+            TV_GAMES_CI_AWS_SECRET_ACCESS_KEY: ${{ secrets.TV_GAMES_CI_AWS_SECRET_ACCESS_KEY }}
+            SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+            DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}

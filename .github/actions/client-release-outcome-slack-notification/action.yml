@@ -1,0 +1,631 @@
+name: "Slack Deployment Notification"
+description: "Sends a Slack notification about deployment status"
+
+inputs:
+  slack-bot-token:
+    description: "Slack bot token for sending messages"
+    required: true
+  openai-api-key:
+    description: "OpenAI API key for generating release summaries"
+    required: true
+  environment:
+    description: "Deployment environment (dev/staging/production)"
+    required: true
+  version:
+    description: "Version being deployed"
+    required: true
+  previous-version:
+    description: "Previous version deployed to this environment (for staging/prod diff)"
+    required: false
+    default: ""
+  sdk-version:
+    description: "Platform SDK version being deployed"
+    required: true
+  repository:
+    description: "GitHub repository (e.g., Volley-Inc/hub)"
+    required: true
+  status:
+    description: "Deployment status (success/failure)"
+    required: true
+    default: "success"
+  triggerer:
+    description: "Who triggered the workflow (e.g., @username)"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Define shared AI prompt configuration
+      id: ai_config
+      shell: bash
+      env:
+        # Shared prompt suffix with emojis and tone instructions
+        # Update this once to change both dev and staging/prod AI summaries
+        PROMPT_SUFFIX: "Write a summary of the actual changes listed. The stakeholders need it. Write from the perspective of a Pagliacci figure onstage -- between externally projected comedy, slapstick, and irony; and on the other hand, internal personal tragedy and self-destruction. Do not necessarily reference the character directly but instead reveal it through subtleties. Use standard unicode emojis sparingly (:eyes:, :rocket:, etc); favor use these custom Slack emojis: :hubbing:, :hubsmile:, :hubsalute:, :hublove:, :thubmsup:, :hubfret:, :hubweary:, :hubcry-tone2:, :hublick:, :hubplague:, :hubdoctah:, :hubstergunnahub:, :hubbyhorse:, :hubbyhorsexl:, :hubbyhorselong:, :hubbussiness:, :hubsquidpirate:, :hubdingding:, :hubsoldier:, :hubdrunk:, :hubzaza:, :officerhub:, :hubcrime:, :hubapproval:, :hubchangesrequested:, :hubape:, :hubjam:, :hubjamharder:, :hubbaby:, :hubpostal:, :hubpride:, :hubevilmoon:, :hubmelting:, :hubmoolah:, :hubedgy:, :hubboss:, :hubbatter:, :hub_shriya_heart:, :hub_shipped:, :hub_rocket:, :hubgineer:, :hubclown:, :hubclown-ontheclock:, :hub_brr:, :hub-care:. PG-13 is fine if it makes sense in the situation. Be surprising and memorable and freaky."
+      run: |
+        echo "$PROMPT_SUFFIX" > /tmp/ai_prompt_suffix.txt
+        echo "prompt_suffix_file=/tmp/ai_prompt_suffix.txt" >> $GITHUB_OUTPUT
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: v${{ inputs.version }}
+
+    - name: Check version mismatch
+      if: ${{ inputs.environment == 'dev' }}
+      id: version_check
+      shell: bash
+      run: |
+        TAG_VERSION="${{ inputs.version }}"
+        PACKAGE_VERSION=$(node -p "require('./apps/client/package.json').version")
+        
+        echo "Tag version: $TAG_VERSION"
+        echo "Package.json version: $PACKAGE_VERSION"
+        
+        if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+          echo "version_mismatch=true" >> $GITHUB_OUTPUT
+          echo "warning=:warning: *Version mismatch:* Tag v${TAG_VERSION} does not match package.json (${PACKAGE_VERSION}). If this is deployed to staging or production, reported diffs may be inaccurate." >> $GITHUB_OUTPUT
+          echo "⚠️  Version mismatch detected!"
+        else
+          echo "version_mismatch=false" >> $GITHUB_OUTPUT
+          echo "warning=" >> $GITHUB_OUTPUT
+          echo "✅ Versions match"
+        fi
+
+    - name: Extract changelog for version
+      if: ${{ inputs.environment == 'dev' }}
+      id: changelog
+      shell: bash
+      run: |
+        # Extract changelog content for the specific version
+        VERSION="${{ inputs.version }}"
+        
+        echo "Looking for version: $VERSION"
+        
+        # Find the section for this version in CHANGELOG.md
+        if [ -f "CHANGELOG.md" ]; then
+          echo "CHANGELOG.md found, searching for version patterns..."
+          
+          # Try to find the version pattern first
+          if grep -q "^# \[${VERSION}\]" CHANGELOG.md; then
+            echo "Found major/minor version pattern # [$VERSION]"
+            # Extract content from # [version] to the next release of any type
+            CHANGELOG_CONTENT=$(sed -n "/^# \[${VERSION}\]/,/^# \[/p" CHANGELOG.md | sed '$d' | tail -n +2 | sed '/^## \[/q' | sed '$d')
+          elif grep -q "^## \[${VERSION}\]" CHANGELOG.md; then
+            echo "Found patch version pattern ## [$VERSION]"
+            # Extract content from ## [version] to the next release of any type
+            CHANGELOG_CONTENT=$(sed -n "/^## \[${VERSION}\]/,/^## \[/p" CHANGELOG.md | sed '$d' | tail -n +2 | sed '/^# \[/q' | sed '$d')
+          else
+            echo "Version pattern not found"
+            CHANGELOG_CONTENT=""
+          fi
+          
+          echo "Raw changelog content length: ${#CHANGELOG_CONTENT}"
+          
+          # Clean up and format the content - only get the key changes
+          if [ -n "$CHANGELOG_CONTENT" ]; then
+            # Filter for just the main bullet points (Features, Bug Fixes, etc.)
+            FILTERED_CONTENT=$(echo "$CHANGELOG_CONTENT" | grep -E "^###|^\*" | head -10)
+            
+            echo "Filtered content: $FILTERED_CONTENT"
+            
+            if [ -n "$FILTERED_CONTENT" ]; then
+              echo "changelog_found=true" >> $GITHUB_OUTPUT
+              # Escape for JSON using jq, then remove outer quotes
+              ESCAPED_CONTENT=$(echo "$FILTERED_CONTENT" | jq -Rs . | sed 's/^"//;s/"$//')
+              echo "changelog_content=$ESCAPED_CONTENT" >> $GITHUB_OUTPUT
+            else
+              echo "changelog_found=false" >> $GITHUB_OUTPUT
+              echo "changelog_content=No meaningful changes found for version $VERSION" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "changelog_found=false" >> $GITHUB_OUTPUT
+            echo "changelog_content=No changelog found for version $VERSION" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "changelog_found=false" >> $GITHUB_OUTPUT
+          echo "changelog_content=CHANGELOG.md not found" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Generate AI summary
+      if: ${{ inputs.environment == 'dev' }}
+      id: ai_summary
+      shell: bash
+      run: |
+        if [ "${{ steps.changelog.outputs.changelog_found }}" = "true" ]; then
+          # Read shared prompt suffix
+          PROMPT_SUFFIX=$(cat "${{ steps.ai_config.outputs.prompt_suffix_file }}")
+          
+          # Build the full prompt
+          FULL_PROMPT="Please provide a brief summary of these release notes in 15 words or less. ${PROMPT_SUFFIX}
+
+        Changelog content:
+        ${{ steps.changelog.outputs.changelog_content }}"
+          
+          # Escape the prompt for JSON
+          ESCAPED_PROMPT=$(echo "$FULL_PROMPT" | jq -Rs .)
+          
+          # Create the JSON payload
+          cat > /tmp/openai_request.json << EOF
+        {
+          "model": "gpt-4o-mini",
+          "messages": [
+            {
+              "role": "user",
+              "content": ${ESCAPED_PROMPT}
+            }
+          ],
+          "max_tokens": 150,
+          "temperature": 1.2
+        }
+        EOF
+          
+          # Make the API request
+          RESPONSE=$(curl -s -X POST "https://api.openai.com/v1/chat/completions" \
+            -H "Authorization: Bearer ${{ inputs.openai-api-key }}" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/openai_request.json)
+          
+          # Debug: log the response
+          echo "OpenAI Response: $RESPONSE"
+          
+          # Extract the summary from the response
+          SUMMARY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message // "Failed to generate summary"')
+          
+          # Clean up temp file
+          rm -f /tmp/openai_request.json
+          
+          # Escape for JSON using jq for proper escaping, then remove outer quotes
+          ESCAPED_SUMMARY=$(echo "$SUMMARY" | tr '\n' ' ' | jq -Rs . | sed 's/^"//;s/"$//')
+          echo "summary=$ESCAPED_SUMMARY" >> $GITHUB_OUTPUT
+        else
+          echo "summary=No changelog available for this version" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Extract version diff for staging/prod
+      if: ${{ inputs.environment != 'dev' && inputs.previous-version != '' }}
+      id: version_diff
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        PREVIOUS_VERSION="${{ inputs.previous-version }}"
+        CURRENT_VERSION="${{ inputs.version }}"
+        
+        echo "Extracting changes from v${PREVIOUS_VERSION} to v${CURRENT_VERSION}"
+        
+        # Get all commits between versions with their subjects
+        COMMITS=$(git log "v${PREVIOUS_VERSION}..v${CURRENT_VERSION}" --format="%s" 2>/dev/null || echo "")
+        
+        if [ -z "$COMMITS" ]; then
+          echo "diff_found=false" >> $GITHUB_OUTPUT
+          echo "diff_content=No changes found between versions" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        echo "diff_found=true" >> $GITHUB_OUTPUT
+        
+        REPO="${{ inputs.repository }}"
+        
+        # Extract meaningful PR titles (filter out merge commits and version bumps)
+        CHANGES=""
+        CHANGE_COUNT=0
+        
+        while IFS= read -r line; do
+          # Skip empty lines
+          [ -z "$line" ] && continue
+          
+          # Skip version bump commits
+          if echo "$line" | grep -qiE "^(chore|release).*version|bump.*version|v[0-9]+\.[0-9]+"; then
+            continue
+          fi
+          
+          # Limit to first 8 items
+          if [ $CHANGE_COUNT -ge 8 ]; then
+            continue
+          fi
+          
+          # Extract PR number if present
+          PR_NUM=$(echo "$line" | grep -oE '\(#[0-9]+\)' | tr -d '(#)' || true)
+          
+          # Clean up the commit message for display
+          CLEAN_MSG=$(echo "$line" | sed 's/ (#[0-9]*)$//')
+          
+          # Sanitize message for Slack mrkdwn links (escape |, <, >)
+          SAFE_MSG=$(echo "$CLEAN_MSG" | sed 's/|/-/g' | sed 's/</\&lt;/g' | sed 's/>/\&gt;/g')
+          
+          # Format as link if PR number exists
+          if [ -n "$PR_NUM" ]; then
+            FORMATTED_MSG="<https://github.com/${REPO}/pull/${PR_NUM}|${SAFE_MSG}>"
+          else
+            FORMATTED_MSG="$CLEAN_MSG"
+          fi
+          
+          # Add to changes list
+          if [ -z "$CHANGES" ]; then
+            CHANGES="• $FORMATTED_MSG"
+          else
+            CHANGES="$CHANGES\n• $FORMATTED_MSG"
+          fi
+          CHANGE_COUNT=$((CHANGE_COUNT + 1))
+        done <<< "$COMMITS"
+        
+        # If we have more than 8 changes, add a note
+        TOTAL_CHANGES=$(echo "$COMMITS" | grep -cvE "^(chore|release).*version|bump.*version|v[0-9]+\.[0-9]+" || echo 0)
+        if [ "$TOTAL_CHANGES" -gt 8 ]; then
+          CHANGES="$CHANGES\n_...and $((TOTAL_CHANGES - 8)) more_"
+        fi
+        
+        # If no meaningful changes after filtering, provide fallback
+        if [ -z "$CHANGES" ]; then
+          CHANGES="• Minor updates and maintenance"
+        fi
+        
+        # Escape for JSON: convert literal \n to actual newlines, then use jq to escape properly
+        # (jq will convert newlines back to \n in the JSON output)
+        ESCAPED_CHANGES=$(echo "$CHANGES" | sed 's/\\n/\n/g' | jq -Rs . | sed 's/^"//;s/"$//')
+        echo "diff_content=$ESCAPED_CHANGES" >> $GITHUB_OUTPUT
+
+    - name: Generate AI summary for staging/prod
+      if: ${{ inputs.environment != 'dev' && inputs.previous-version != '' && steps.version_diff.outputs.diff_found == 'true' }}
+      id: ai_summary_diff
+      shell: bash
+      run: |
+        DIFF_CONTENT="${{ steps.version_diff.outputs.diff_content }}"
+        
+        # Read shared prompt suffix
+        PROMPT_SUFFIX=$(cat "${{ steps.ai_config.outputs.prompt_suffix_file }}")
+        
+        # Build the full prompt
+        FULL_PROMPT="Please provide a brief summary of these changes being deployed in 20 words or less. ${PROMPT_SUFFIX}
+
+        Commit messages being deployed:
+        ${DIFF_CONTENT}"
+        
+        # Escape the prompt for JSON
+        ESCAPED_PROMPT=$(echo "$FULL_PROMPT" | jq -Rs .)
+        
+        # Create the JSON payload
+        cat > /tmp/openai_request.json << EOF
+        {
+          "model": "gpt-4o-mini",
+          "messages": [
+            {
+              "role": "user",
+              "content": ${ESCAPED_PROMPT}
+            }
+          ],
+          "max_tokens": 150,
+          "temperature": 1.2
+        }
+        EOF
+        
+        # Make the API request
+        RESPONSE=$(curl -s -X POST "https://api.openai.com/v1/chat/completions" \
+          -H "Authorization: Bearer ${{ inputs.openai-api-key }}" \
+          -H "Content-Type: application/json" \
+          -d @/tmp/openai_request.json)
+        
+        # Debug: log the response
+        echo "OpenAI Response: $RESPONSE"
+        
+        # Extract the summary from the response
+        SUMMARY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message // "Failed to generate summary"')
+        
+        # Clean up temp file
+        rm -f /tmp/openai_request.json
+        
+        # Escape for JSON using jq for proper escaping, then remove outer quotes
+        ESCAPED_SUMMARY=$(echo "$SUMMARY" | tr '\n' ' ' | jq -Rs . | sed 's/^"//;s/"$//')
+        echo "summary=$ESCAPED_SUMMARY" >> $GITHUB_OUTPUT
+
+    - name: Roll for horse fact (1/20 chance)
+      id: horse_roll
+      shell: bash
+      run: |
+        # Roll 1-20
+        ROLL=$((RANDOM % 20 + 1))
+        echo "Horse fact roll: $ROLL (need 1 to trigger)"
+        
+        if [ "$ROLL" -eq 1 ]; then
+          echo "show_horse_fact=true" >> $GITHUB_OUTPUT
+          
+          # Roll 1-5 to determine if it's a lie
+          LIE_ROLL=$((RANDOM % 5 + 1))
+          echo "Lie roll: $LIE_ROLL (1 = lie)"
+          
+          if [ "$LIE_ROLL" -eq 1 ]; then
+            echo "is_lie=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_lie=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "show_horse_fact=false" >> $GITHUB_OUTPUT
+          echo "is_lie=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Generate horse fact
+      if: ${{ steps.horse_roll.outputs.show_horse_fact == 'true' }}
+      id: horse_fact
+      shell: bash
+      run: |
+        IS_LIE="${{ steps.horse_roll.outputs.is_lie }}"
+        
+        if [ "$IS_LIE" = "true" ]; then
+          HORSE_PROMPT="Generate a single completely made-up 'fact' about horses that is absolutely false but semi-plausible at a glance. Be creative. Present it deadpan as if it were real. One sentence only. Do not indicate it's false."
+        else
+          HORSE_PROMPT="Share one genuinely true and interesting fact about horses that most people don't know. Be specific and surprising. One sentence only."
+        fi
+        
+        # Escape the prompt for JSON
+        ESCAPED_PROMPT=$(echo "$HORSE_PROMPT" | jq -Rs .)
+        
+        # Create the JSON payload
+        cat > /tmp/horse_request.json << EOF
+        {
+          "model": "gpt-4o-mini",
+          "messages": [
+            {
+              "role": "user",
+              "content": ${ESCAPED_PROMPT}
+            }
+          ],
+          "max_tokens": 100,
+          "temperature": 1.4
+        }
+        EOF
+        
+        # Make the API request
+        RESPONSE=$(curl -s -X POST "https://api.openai.com/v1/chat/completions" \
+          -H "Authorization: Bearer ${{ inputs.openai-api-key }}" \
+          -H "Content-Type: application/json" \
+          -d @/tmp/horse_request.json)
+        
+        echo "Horse fact response: $RESPONSE"
+        
+        # Extract the fact
+        FACT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "Horses exist."')
+        
+        rm -f /tmp/horse_request.json
+        
+        # Collapse newlines but keep raw content - jq will escape it when building JSON
+        CLEAN_FACT=$(echo "$FACT" | tr '\n' ' ')
+        echo "fact=$CLEAN_FACT" >> $GITHUB_OUTPUT
+
+    - name: Build horse fact block
+      id: horse_block
+      shell: bash
+      env:
+        HORSE_FACT: ${{ steps.horse_fact.outputs.fact }}
+        SHOW_HORSE_FACT: ${{ steps.horse_roll.outputs.show_horse_fact }}
+      run: |
+        if [ "$SHOW_HORSE_FACT" = "true" ]; then
+          # Build JSON block using jq reading from env var to avoid bash escaping issues
+          BLOCK=$(jq -n --arg prefix ":hubbyhorse: *Horse Fact:* " \
+            '($prefix + env.HORSE_FACT) as $fact |
+            [{"type": "divider"}, {"type": "section", "text": {"type": "mrkdwn", "text": $fact}}]')
+          # Output as compact JSON with leading comma, removing outer brackets
+          BLOCK_INNER=$(echo "$BLOCK" | jq -c '.' | sed 's/^\[//;s/\]$//')
+          echo "block=,${BLOCK_INNER}" >> $GITHUB_OUTPUT
+        else
+          echo "block=" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Send Slack notification (Dev with AI summary)
+      if: ${{ inputs.environment == 'dev' && steps.version_check.outputs.version_mismatch != 'true' }}
+      uses: slackapi/slack-github-action@v1.24.0
+      with:
+          channel-id: 'hub-releases'
+          payload: |
+              {
+                "text": "",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.status == 'success' && ':hubsmile:' || ':hubfret:' }} Hub Client deployment to *${{ inputs.environment }}* ${{ inputs.status == 'success' && 'completed' || 'failed' }}"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Version:*\nv${{ inputs.version }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Environment:*\n${{ inputs.environment }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Platform SDK:*\nv${{ inputs.sdk-version }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Triggered by:*\n${{ inputs.triggerer || 'Automated' }}"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*What's New:*\n${{ steps.ai_summary.outputs.summary }}\n\n<https://github.com/${{ inputs.repository }}/releases/tag/v${{ inputs.version }}|📋 View Full Changelog>"
+                    }
+                  }${{ steps.horse_block.outputs.block }}
+                ]
+              }
+      env:
+          SLACK_BOT_TOKEN: ${{ inputs.slack-bot-token }}
+
+    - name: Send Slack notification (Dev with version mismatch warning)
+      if: ${{ inputs.environment == 'dev' && steps.version_check.outputs.version_mismatch == 'true' }}
+      uses: slackapi/slack-github-action@v1.24.0
+      with:
+          channel-id: 'hub-releases'
+          payload: |
+              {
+                "text": "",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.status == 'success' && ':hubsmile:' || ':hubfret:' }} Hub Client deployment to *${{ inputs.environment }}* ${{ inputs.status == 'success' && 'completed' || 'failed' }}"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "${{ steps.version_check.outputs.warning }}"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Version:*\nv${{ inputs.version }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Environment:*\n${{ inputs.environment }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Platform SDK:*\nv${{ inputs.sdk-version }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Triggered by:*\n${{ inputs.triggerer || 'Automated' }}"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*What's New:*\n${{ steps.ai_summary.outputs.summary }}\n\n<https://github.com/${{ inputs.repository }}/releases/tag/v${{ inputs.version }}|📋 View Full Changelog>"
+                    }
+                  }${{ steps.horse_block.outputs.block }}
+                ]
+              }
+      env:
+          SLACK_BOT_TOKEN: ${{ inputs.slack-bot-token }}
+
+    - name: Send Slack notification (Non-dev with version diff)
+      if: ${{ inputs.environment != 'dev' && inputs.previous-version != '' && steps.version_diff.outputs.diff_found == 'true' }}
+      uses: slackapi/slack-github-action@v1.24.0
+      with:
+          channel-id: 'hub-releases'
+          payload: |
+              {
+                "text": "",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.status == 'success' && ':hubsmile:' || ':hubfret:' }} Hub Client deployment to *${{ inputs.environment }}* ${{ inputs.status == 'success' && 'completed' || 'failed' }}"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Version:*\nv${{ inputs.previous-version }} → v${{ inputs.version }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Environment:*\n${{ inputs.environment }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Platform SDK:*\nv${{ inputs.sdk-version }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Triggered by:*\n${{ inputs.triggerer || 'Automated' }}"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*What's New:*\n${{ steps.ai_summary_diff.outputs.summary }}"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*Changes in this deployment:*\n${{ steps.version_diff.outputs.diff_content }}"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "<https://github.com/${{ inputs.repository }}/compare/v${{ inputs.previous-version }}...v${{ inputs.version }}|📋 View Full Diff>"
+                    }
+                  }${{ steps.horse_block.outputs.block }}
+                ]
+              }
+      env:
+          SLACK_BOT_TOKEN: ${{ inputs.slack-bot-token }}
+
+    - name: Send Slack notification (Non-dev without version diff)
+      if: ${{ inputs.environment != 'dev' && (inputs.previous-version == '' || steps.version_diff.outputs.diff_found != 'true') }}
+      uses: slackapi/slack-github-action@v1.24.0
+      with:
+          channel-id: 'hub-releases'
+          payload: |
+              {
+                "text": "",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.status == 'success' && ':hubsmile:' || ':hubfret:' }} Hub Client deployment to *${{ inputs.environment }}* ${{ inputs.status == 'success' && 'completed' || 'failed' }}"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Version:*\nv${{ inputs.version }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Environment:*\n${{ inputs.environment }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Platform SDK:*\nv${{ inputs.sdk-version }}"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Triggered by:*\n${{ inputs.triggerer || 'Automated' }}"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "<https://github.com/${{ inputs.repository }}/releases/tag/v${{ inputs.version }}|📋 View Full Changelog>"
+                    }
+                  }${{ steps.horse_block.outputs.block }}
+                ]
+              }
+      env:
+          SLACK_BOT_TOKEN: ${{ inputs.slack-bot-token }} 

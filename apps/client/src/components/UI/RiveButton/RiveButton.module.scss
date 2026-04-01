@@ -1,0 +1,40 @@
+@use "sass:color";
+@use "../../../Variables.scss" as *;
+
+.buttonContainer {
+    width: scale(160);
+    height: scale(80);
+}
+
+.fallbackButton {
+    border: none;
+    outline: none;
+    margin: 0;
+    padding: 0;
+    font-family: inherit;
+    width: scale(160);
+    height: scale(80);
+    background: var(--Color-Button-Unselected, #424242);
+    border-radius: scale(40);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--Color-Text-Primary, $white);
+    font-size: scale(32);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover,
+    &:focus {
+        background: var(--Color-Button-Selected, $modal-highlight-yellow);
+        color: var(--Color-Button-Selected-Text, #000);
+        transform: scale(1.05);
+    }
+
+    &.focused {
+        background: var(--Color-Button-Selected, $modal-highlight-yellow);
+        color: var(--Color-Button-Selected-Text, #000);
+        transform: scale(1.05);
+    }
+}

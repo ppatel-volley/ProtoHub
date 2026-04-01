@@ -1,0 +1,27 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "plugin": ["typedoc-plugin-mermaid"],
+  "entryPoints": [
+    "src/hooks",
+    "src/experiments",
+    "src/utils",
+    "src/config",
+    "src/components"
+  ],
+  "entryPointStrategy": "expand",
+  "projectDocuments": [
+    "../../docs/*.md",
+    "docs/*.md"
+  ],
+  "customCss": "docs/custom-theme.css",
+  "out": "../../docs/client",
+  "readme": "README.md",
+  "exclude": ["**/*.test.*", "**/*.spec.*", "**/*.module.scss"],
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "categorizeByGroup": true,
+  "gitRevision": "main",
+  "navigationLinks": {
+    "GitHub": "https://github.com/Volley-Inc/hub"
+  }
+}

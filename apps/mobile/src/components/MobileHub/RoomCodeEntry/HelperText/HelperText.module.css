@@ -1,0 +1,10 @@
+.helperText {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    font-weight: 600;
+    font-feature-settings:
+        'liga' off,
+        'clig' off;
+    text-align: center;
+    margin: 0;
+} 

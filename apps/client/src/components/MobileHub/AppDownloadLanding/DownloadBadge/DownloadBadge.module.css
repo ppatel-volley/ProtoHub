@@ -1,0 +1,50 @@
+.googlePlayBadge {
+    width: 204px;
+    height: 68px;
+    flex-shrink: 0;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.appleStoreBadge {
+    width: 204px;
+    height: 68px;
+    flex-shrink: 0;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.badgeContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 30px;
+    z-index: 1;
+}
+
+.leftContainer {
+    align-items: flex-start;
+    margin-bottom: 0;
+}
+
+.badgeLink {
+    display: block;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+
+    &:hover {
+        opacity: 0.8;
+    }
+}
+
+@media screen and (min-width: 567px) {
+    .badgeContainer {
+        flex-direction: row;
+        margin-bottom: 20px;
+    }
+
+    .leftContainer {
+        margin-bottom: 0;
+    }
+}

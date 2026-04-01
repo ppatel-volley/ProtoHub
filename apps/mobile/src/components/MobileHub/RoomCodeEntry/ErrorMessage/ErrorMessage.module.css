@@ -1,0 +1,10 @@
+.errorMessage {
+    color: #ff3b30;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    font-feature-settings:
+        'liga' off,
+        'clig' off;
+    margin: 0;
+} 
