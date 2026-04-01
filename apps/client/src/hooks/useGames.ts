@@ -31,39 +31,39 @@ export interface Game {
 }
 
 /**
- * Placeholder games using assets already in public/assets/images/games/.
+ * Placeholder Foundry games with AI-generated artwork.
  * These will be replaced by Registry API + Bifrost prototype fetching.
  */
 const PLACEHOLDER_GAMES: Game[] = [
     {
-        id: "jeopardy",
-        title: "Jeopardy",
-        tileImageUrl: `${BASE_URL}assets/images/games/tiles/jeopardy.avif`,
-        heroImageUrl: `${BASE_URL}assets/images/games/heroes/jeopardy.avif`,
+        id: "brain-blast",
+        title: "Brain Blast",
+        tileImageUrl: `${BASE_URL}assets/images/games/tiles/brain-blast.webp`,
+        heroImageUrl: `${BASE_URL}assets/images/games/heroes/brain-blast.webp`,
     },
     {
-        id: "song-quiz",
-        title: "Song Quiz",
-        tileImageUrl: `${BASE_URL}assets/images/games/tiles/song-quiz.avif`,
-        heroImageUrl: `${BASE_URL}assets/images/games/heroes/song-quiz.avif`,
+        id: "cosmic-clash",
+        title: "Cosmic Clash",
+        tileImageUrl: `${BASE_URL}assets/images/games/tiles/cosmic-clash.webp`,
+        heroImageUrl: `${BASE_URL}assets/images/games/heroes/cosmic-clash.webp`,
     },
     {
-        id: "cocomelon",
-        title: "CoComelon",
-        tileImageUrl: `${BASE_URL}assets/images/games/tiles/ccm.avif`,
-        heroImageUrl: `${BASE_URL}assets/images/games/heroes/ccm.avif`,
+        id: "word-forge",
+        title: "Word Forge",
+        tileImageUrl: `${BASE_URL}assets/images/games/tiles/word-forge.webp`,
+        heroImageUrl: `${BASE_URL}assets/images/games/heroes/word-forge.webp`,
     },
     {
-        id: "wheel-of-fortune",
-        title: "Wheel of Fortune",
-        tileImageUrl: `${BASE_URL}assets/images/games/tiles/wof.avif`,
-        heroImageUrl: `${BASE_URL}assets/images/games/heroes/wof.avif`,
+        id: "rhythm-rush",
+        title: "Rhythm Rush",
+        tileImageUrl: `${BASE_URL}assets/images/games/tiles/rhythm-rush.webp`,
+        heroImageUrl: `${BASE_URL}assets/images/games/heroes/rhythm-rush.webp`,
     },
     {
-        id: "wits-end",
-        title: "Wit's End",
-        tileImageUrl: `${BASE_URL}assets/images/games/tiles/wits-end.webp`,
-        heroImageUrl: `${BASE_URL}assets/images/games/heroes/wits-end-static.webp`,
+        id: "draw-duel",
+        title: "Draw Duel",
+        tileImageUrl: `${BASE_URL}assets/images/games/tiles/draw-duel.webp`,
+        heroImageUrl: `${BASE_URL}assets/images/games/heroes/draw-duel.webp`,
     },
 ]
 
