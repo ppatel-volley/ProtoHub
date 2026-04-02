@@ -68,7 +68,7 @@ export class FoundryGameOrchestration implements IGameOrchestration {
             )
         }
 
-        const url = new URL(`${game.deploymentUrl}/display`)
+        const url = new URL(game.deploymentUrl)
         const params = url.searchParams
 
         params.set("sessionId", this.hubSessionId)
