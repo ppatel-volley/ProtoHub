@@ -29,7 +29,6 @@ import GamesCarousel from "../../GamesCarousel"
 import { LaunchedGame } from "../../LaunchedGame/LaunchedGame"
 import { WeekendRebrandModal } from "../../WeekendRebrandModal"
 import { BrandLogo } from "../BrandLogo"
-import { Debug } from "../Debug"
 import { HeroAssetFader } from "./HeroAssetFader"
 import styles from "./Main.module.scss"
 
@@ -262,10 +261,7 @@ const MainContent: React.FC<{
 
     return (
         <div>
-            {!launchedGameState?.activeGame &&
-                ENVIRONMENT !== Environment.PRODUCTION && (
-                    <Debug isInitialized={isInitialized} />
-                )}
+            {/* Debug overlay removed — not needed for Foundry */}
             {body}
         </div>
     )
