@@ -1,0 +1,136 @@
+name: Deploy Proto-Hub Client
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/client/**"
+      - "packages/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        options: [dev, staging, prod]
+        default: dev
+
+concurrency:
+  group: deploy-client-${{ inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+env:
+  S3_PREFIX: protohub
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine environment
+        id: env
+        run: |
+          ENV="${{ inputs.environment || 'dev' }}"
+          echo "ENV=$ENV" >> "$GITHUB_ENV"
+          echo "S3_BUCKET=crucible-clients-$ENV" >> "$GITHUB_ENV"
+
+          if [ "$ENV" = "dev" ]; then
+            echo "BIFROST_API_URL=https://bifrost-api.volley-services.net" >> "$GITHUB_ENV"
+            echo "CRUCIBLE_REGISTRY_API_URL=" >> "$GITHUB_ENV"
+          elif [ "$ENV" = "staging" ]; then
+            echo "BIFROST_API_URL=https://bifrost-api.volley-services.net" >> "$GITHUB_ENV"
+            echo "CRUCIBLE_REGISTRY_API_URL=" >> "$GITHUB_ENV"
+          else
+            echo "BIFROST_API_URL=https://bifrost-api.volley-services.net" >> "$GITHUB_ENV"
+            echo "CRUCIBLE_REGISTRY_API_URL=" >> "$GITHUB_ENV"
+          fi
+
+      - name: Generate environment config
+        working-directory: apps/client
+        run: node scripts/build-env-config.js
+        env:
+          ENVIRONMENT: ${{ env.ENV }}
+          BIFROST_API_URL: ${{ env.BIFROST_API_URL }}
+          CRUCIBLE_REGISTRY_API_URL: ${{ env.CRUCIBLE_REGISTRY_API_URL }}
+          SEGMENT_WRITE_KEY: ""
+          DATADOG_APPLICATION_ID: ""
+          DATADOG_CLIENT_TOKEN: ""
+
+      - name: Build
+        working-directory: apps/client
+        run: pnpm build
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::375633680607:role/crucible-ci
+          aws-region: us-east-1
+
+      - name: Deploy to S3
+        working-directory: apps/client
+        run: |
+          # HTML files: no cache
+          find dist -name "*.html" -type f | while read file; do
+            KEY="${S3_PREFIX}/${file#dist/}"
+            aws s3 cp "$file" "s3://${S3_BUCKET}/${KEY}" \
+              --cache-control "public, max-age=0, must-revalidate" \
+              --content-type "text/html; charset=utf-8"
+          done
+
+          # config.js: short cache (changes per deploy)
+          if [ -f dist/config.js ]; then
+            aws s3 cp dist/config.js "s3://${S3_BUCKET}/${S3_PREFIX}/config.js" \
+              --cache-control "public, max-age=10" \
+              --content-type "application/javascript; charset=utf-8"
+          fi
+
+          # JS assets: immutable long-term cache
+          find dist/assets -name "*.js" -type f 2>/dev/null | while read file; do
+            KEY="${S3_PREFIX}/${file#dist/}"
+            aws s3 cp "$file" "s3://${S3_BUCKET}/${KEY}" \
+              --cache-control "public, max-age=31536000, immutable" \
+              --content-type "application/javascript; charset=utf-8"
+          done
+
+          # CSS assets: immutable long-term cache
+          find dist/assets -name "*.css" -type f 2>/dev/null | while read file; do
+            KEY="${S3_PREFIX}/${file#dist/}"
+            aws s3 cp "$file" "s3://${S3_BUCKET}/${KEY}" \
+              --cache-control "public, max-age=31536000, immutable" \
+              --content-type "text/css; charset=utf-8"
+          done
+
+          # Everything else (fonts, images, etc): long cache
+          find dist -type f \
+            ! -name "*.html" ! -name "*.js" ! -name "*.css" ! -name "config.js" \
+            2>/dev/null | while read file; do
+            KEY="${S3_PREFIX}/${file#dist/}"
+            aws s3 cp "$file" "s3://${S3_BUCKET}/${KEY}" \
+              --cache-control "public, max-age=86400"
+          done
+
+          echo "### Deploy Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environment: $ENV" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Bucket: s3://${S3_BUCKET}/${S3_PREFIX}/" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Files: $(find dist -type f | wc -l)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify deployment
+        run: |
+          # Check index.html exists
+          aws s3 head-object \
+            --bucket "${S3_BUCKET}" \
+            --key "${S3_PREFIX}/index.html" \
+            --no-cli-pager
+          echo "✓ index.html verified in s3://${S3_BUCKET}/${S3_PREFIX}/"
