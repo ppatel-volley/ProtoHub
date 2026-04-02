@@ -46,24 +46,10 @@ export interface Game {
 // ---------------------------------------------------------------------------
 
 /**
- * Registry API and Bifrost API URLs.
- * In production these come from window.APP_CONFIG; for now, env vars or defaults.
+ * Registry API and Bifrost API URLs from runtime config.
  */
-const REGISTRY_API_URL =
-    (window as Record<string, unknown>).APP_CONFIG &&
-    (window as Record<string, { CRUCIBLE_REGISTRY_API_URL?: string }>)
-        .APP_CONFIG?.CRUCIBLE_REGISTRY_API_URL
-        ? (window as Record<string, { CRUCIBLE_REGISTRY_API_URL: string }>)
-              .APP_CONFIG.CRUCIBLE_REGISTRY_API_URL
-        : null
-
-const BIFROST_API_URL =
-    (window as Record<string, unknown>).APP_CONFIG &&
-    (window as Record<string, { BIFROST_API_URL?: string }>).APP_CONFIG
-        ?.BIFROST_API_URL
-        ? (window as Record<string, { BIFROST_API_URL: string }>).APP_CONFIG
-              .BIFROST_API_URL
-        : null
+const REGISTRY_API_URL = window.APP_CONFIG?.CRUCIBLE_REGISTRY_API_URL ?? null
+const BIFROST_API_URL = window.APP_CONFIG?.BIFROST_API_URL ?? null
 
 const POLL_INTERVAL_MS = 15_000
 

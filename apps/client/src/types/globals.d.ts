@@ -8,6 +8,8 @@ export interface AppConfig {
   environment: Environment;
   DATADOG_APPLICATION_ID: string;
   DATADOG_CLIENT_TOKEN: string;
+  BIFROST_API_URL?: string;
+  CRUCIBLE_REGISTRY_API_URL?: string;
 }
 
 // Extend the Window interface
