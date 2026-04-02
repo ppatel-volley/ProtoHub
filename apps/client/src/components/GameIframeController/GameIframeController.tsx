@@ -88,6 +88,20 @@ export const GameIframeController = ({
         }, GAME_LOADING_DELAY)
     }, [])
 
+    // Fallback: auto-mark as ready after 5 seconds for non-VGF games
+    // that don't send the Platform SDK "ready" event.
+    useEffect(() => {
+        const fallback = setTimeout(() => {
+            if (!gameLoaded) {
+                logger.info(
+                    "GameIframeController - ready timeout fallback: auto-marking game as loaded"
+                )
+                onReady()
+            }
+        }, 5000)
+        return () => clearTimeout(fallback)
+    }, [gameLoaded, onReady])
+
     return (
         <div className="game-iframe-container">
             {!gameLoaded && isGameLoadingSlowly && (
