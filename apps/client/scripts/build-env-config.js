@@ -58,6 +58,10 @@ const config = {
         process.env.DATADOG_APPLICATION_ID || "ecb2cc5c-e9e7-4b5a-84db-5a30226cf47b",
     DATADOG_CLIENT_TOKEN:
         process.env.DATADOG_CLIENT_TOKEN || "puba0d4f79e1c746beb2eb899c779858f08",
+    BIFROST_API_URL:
+        process.env.BIFROST_API_URL || "/bifrost-api",
+    CRUCIBLE_REGISTRY_API_URL:
+        process.env.CRUCIBLE_REGISTRY_API_URL || "",
 }
 
 // Generate the config.js content
