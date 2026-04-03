@@ -94,19 +94,46 @@ window.addEventListener(
     { passive: false }
 )
 
+// On Fire TV via VWR, PlatformProvider may crash because the session ID
+// isn't in the URL params (VWR manages sessions via RPC, not URL).
+// Use an error boundary to fall back to rendering without PlatformProvider.
+import { Component, type ReactNode } from "react"
+
+class PlatformErrorBoundary extends Component<
+    { children: ReactNode; fallback: ReactNode },
+    { hasError: boolean }
+> {
+    state = { hasError: false }
+    static getDerivedStateFromError() {
+        return { hasError: true }
+    }
+    componentDidCatch(error: Error) {
+        console.warn("PlatformProvider failed, rendering without it:", error.message)
+    }
+    render() {
+        return this.state.hasError ? this.props.fallback : this.props.children
+    }
+}
+
+const appContent = (
+    <ArrowPressProvider>
+        <ChunkLoadErrorBoundary>
+            <Suspense fallback={null}>
+                <App />
+            </Suspense>
+        </ChunkLoadErrorBoundary>
+    </ArrowPressProvider>
+)
+
 createRoot(rootElement).render(
-    <PlatformProvider
-        options={{
-            ...basePlatformOptions,
-            gameId: "proto-hub",
-        }}
-    >
-        <ArrowPressProvider>
-            <ChunkLoadErrorBoundary>
-                <Suspense fallback={null}>
-                    <App />
-                </Suspense>
-            </ChunkLoadErrorBoundary>
-        </ArrowPressProvider>
-    </PlatformProvider>
+    <PlatformErrorBoundary fallback={appContent}>
+        <PlatformProvider
+            options={{
+                ...basePlatformOptions,
+                gameId: "proto-hub",
+            }}
+        >
+            {appContent}
+        </PlatformProvider>
+    </PlatformErrorBoundary>
 )
