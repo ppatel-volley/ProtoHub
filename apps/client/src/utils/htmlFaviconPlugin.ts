@@ -1,6 +1,6 @@
 import type { Plugin } from "vite"
 
-export const BASE_PATH = "/hub/"
+export const BASE_PATH = "/"
 
 export const htmlFaviconPlugin = (): Plugin => {
     return {
