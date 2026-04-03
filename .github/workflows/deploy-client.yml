@@ -70,9 +70,16 @@ jobs:
           DATADOG_APPLICATION_ID: ""
           DATADOG_CLIENT_TOKEN: ""
 
+      - name: Read version
+        id: version
+        working-directory: apps/client
+        run: echo "VERSION=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+
       - name: Build
         working-directory: apps/client
-        run: pnpm build
+        run: npx vite build
+        env:
+          npm_package_version: ${{ steps.version.outputs.VERSION }}
 
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
