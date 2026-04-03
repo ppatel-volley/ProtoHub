@@ -93,11 +93,11 @@ export const GamesCarousel = ({
 
         if (screenDisplayedId) {
             void track("Hub Button Pressed", {
-                choiceValue: game.trackingId,
+                choiceValue: game.id,
                 eventCategory: "menu",
                 eventSubCategory: "game selection",
                 screenDisplayedId,
-                displayChoices: games.map((g) => g.trackingId),
+                displayChoices: games.map((g) => g.id),
                 text: "",
             })
         } else {

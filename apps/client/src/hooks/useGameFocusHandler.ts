@@ -33,7 +33,7 @@ export const useGameFocusHandler = ({
             if (screenDisplayedIdRef.current !== null) {
                 track("Hub Button Hovered", {
                     eventCategory: "menu" as const,
-                    eventSubCategory: game.trackingId,
+                    eventSubCategory: game.id,
                     screenDisplayedId: screenDisplayedIdRef.current,
                     heroId: game.heroImageUrl,
                     tileId: game.tileImageUrl,

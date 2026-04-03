@@ -51,7 +51,7 @@ export const useHubScreenTracking = (
             )
             void track("Hub Screen Displayed", {
                 screenDisplayedId: newScreenDisplayedId,
-                displayChoices: games.map((game) => game.trackingId),
+                displayChoices: games.map((game) => game.id),
                 eventCategory: "menu",
                 eventSubCategory: "game selection",
                 text: "",
