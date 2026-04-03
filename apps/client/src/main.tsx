@@ -7,25 +7,6 @@ import { PlatformProvider } from "@volley/platform-sdk/react"
 import { lazy, Suspense } from "react"
 import { createRoot } from "react-dom/client"
 
-/**
- * Inject a fallback hub session ID for local/dev/staging so PlatformProvider
- * doesn't crash. Matches the pattern from emoji-multiplatform and BUILDING_TV_GAMES.md.
- */
-function ensureLocalHubSessionId(stage: string): void {
-    if (stage !== "local" && stage !== "dev" && stage !== "staging") return
-    const url = new URL(window.location.href)
-    if (!url.searchParams.has("volley_hub_session_id")) {
-        url.searchParams.set("volley_hub_session_id", "local-dev-hub-session")
-        // Use both replaceState AND redirect to ensure the SDK picks it up
-        // On Fire TV WebView inside VWR, replaceState alone doesn't work
-        window.history.replaceState({}, "", url.toString())
-        // If we're in a fresh page load (no session ID), redirect to force it
-        if (!window.location.search.includes("volley_hub_session_id")) {
-            window.location.replace(url.toString())
-        }
-    }
-}
-
 import packageJson from "../package.json"
 import { ChunkLoadErrorBoundary } from "./components/ChunkLoadErrorBoundary/ChunkLoadErrorBoundary"
 import { ArrowPressProvider } from "./components/FocusableUI/ArrowPressContext"
@@ -57,26 +38,6 @@ const basePlatformOptions = {
     readyEventTimeoutMs: 30000,
 }
 
-// Inject fallback session ID before PlatformProvider mounts
-ensureLocalHubSessionId(PLATFORM_STAGE)
-
-// Signal VWR that the app has loaded. Send immediately and repeat
-// after a short delay to ensure VWR's message listener is ready.
-function signalVwrReady(): void {
-    try {
-        window.parent.postMessage(
-            { type: "ready", source: "platform-sdk-iframe", args: [] },
-            "*"
-        )
-    } catch {
-        // Not in an iframe — ignore
-    }
-}
-signalVwrReady()
-setTimeout(signalVwrReady, 500)
-setTimeout(signalVwrReady, 1500)
-setTimeout(signalVwrReady, 3000)
-
 init({ throttleKeypresses: true, throttle: 50 })
 initResourceDetection([pngDetector, s3Detector])
 window.addEventListener(
@@ -94,46 +55,23 @@ window.addEventListener(
     { passive: false }
 )
 
-// On Fire TV via VWR, PlatformProvider may crash because the session ID
-// isn't in the URL params (VWR manages sessions via RPC, not URL).
-// Use an error boundary to fall back to rendering without PlatformProvider.
-import { Component, type ReactNode } from "react"
-
-class PlatformErrorBoundary extends Component<
-    { children: ReactNode; fallback: ReactNode },
-    { hasError: boolean }
-> {
-    state = { hasError: false }
-    static getDerivedStateFromError() {
-        return { hasError: true }
-    }
-    componentDidCatch(error: Error) {
-        console.warn("PlatformProvider failed, rendering without it:", error.message)
-    }
-    render() {
-        return this.state.hasError ? this.props.fallback : this.props.children
-    }
-}
-
-const appContent = (
-    <ArrowPressProvider>
-        <ChunkLoadErrorBoundary>
-            <Suspense fallback={null}>
-                <App />
-            </Suspense>
-        </ChunkLoadErrorBoundary>
-    </ArrowPressProvider>
-)
-
+// gameId: "hub" is critical. The Platform SDK auto-generates a session ID
+// when gameId === "hub" (via isHub() check in getHubSessionId). Any other
+// gameId causes a crash when volley_hub_session_id is missing from the URL.
+// This also enables VWR RPC integration and automatic ready event emission.
 createRoot(rootElement).render(
-    <PlatformErrorBoundary fallback={appContent}>
-        <PlatformProvider
-            options={{
-                ...basePlatformOptions,
-                gameId: "proto-hub",
-            }}
-        >
-            {appContent}
-        </PlatformProvider>
-    </PlatformErrorBoundary>
+    <PlatformProvider
+        options={{
+            ...basePlatformOptions,
+            gameId: "hub",
+        }}
+    >
+        <ArrowPressProvider>
+            <ChunkLoadErrorBoundary>
+                <Suspense fallback={null}>
+                    <App />
+                </Suspense>
+            </ChunkLoadErrorBoundary>
+        </ArrowPressProvider>
+    </PlatformProvider>
 )
