@@ -1,8 +1,8 @@
 import type { datadogRum } from "@datadog/browser-rum"
 import { act, renderHook } from "@testing-library/react"
 
-import { GameStatus, PaywallType } from "../constants/game"
-import { type Game, GameId } from "./useGames"
+import { GameStatus } from "../constants/game"
+import type { Game } from "./useGames"
 import { LaunchedGameState, useLaunchedGameState } from "./useLaunchedGameState"
 
 const createMockVitalRef = (): ReturnType<
@@ -11,13 +11,12 @@ const createMockVitalRef = (): ReturnType<
 
 describe("useLaunchedGameState", () => {
     const mockGame: Game = {
-        id: GameId.Jeopardy,
+        id: "jeopardy",
         title: "Test Game",
-        trackingId: "jeopardy",
         tileImageUrl: "test-tile.avif",
         heroImageUrl: "test-hero.avif",
         animationUri: "test-animation.riv",
-        paywallType: PaywallType.None,
+        source: "placeholder" as const,
         status: GameStatus.New,
     }
 

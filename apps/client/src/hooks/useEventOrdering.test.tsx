@@ -11,8 +11,7 @@
 
 import { act, renderHook } from "@testing-library/react"
 
-import { PaywallType } from "../constants/game"
-import { type Game, GameId } from "./useGames"
+import type { Game } from "./useGames"
 import { useHubScreenTracking } from "./useHubScreenTracking"
 import {
     HUB_SESSION_START_DELAY_MS,
@@ -34,12 +33,6 @@ jest.mock("../utils/logger", () => ({
 
 jest.mock("./useGames", () => ({
     useGames: jest.fn(),
-    GameId: {
-        Jeopardy: "jeopardy",
-        SongQuiz: "song-quiz",
-        CoComelon: "cocomelon",
-        WheelOfFortune: "wheel-of-fortune",
-    },
 }))
 
 jest.mock("./useHubTracking", () => ({
@@ -111,20 +104,18 @@ describe("Hub Session Start and Hub Screen Displayed Event Ordering", () => {
 
         mockUseGames.mockReturnValue([
             {
-                id: GameId.Jeopardy,
-                trackingId: "jeopardy",
+                id: "jeopardy",
                 title: "Jeopardy",
                 tileImageUrl: "test-tile.avif",
                 heroImageUrl: "test-hero.avif",
-                paywallType: PaywallType.Soft,
+                source: "placeholder" as const,
             },
             {
-                id: GameId.SongQuiz,
-                trackingId: "song quiz",
+                id: "song-quiz",
                 title: "Song Quiz",
                 tileImageUrl: "test-tile-2.avif",
                 heroImageUrl: "test-hero-2.avif",
-                paywallType: PaywallType.None,
+                source: "placeholder" as const,
             },
         ])
     })

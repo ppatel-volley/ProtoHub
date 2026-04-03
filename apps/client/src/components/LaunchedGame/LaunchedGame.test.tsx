@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react"
 
-import { PaywallType } from "../../constants/game"
-import { type Game, GameId } from "../../hooks/useGames"
+import type { Game } from "../../hooks/useGames"
 import { LaunchedGameState } from "../../hooks/useLaunchedGameState"
 
 jest.mock("../../hooks/useHubTimedReset", () => ({
@@ -115,12 +114,11 @@ describe("LaunchedGame Component", () => {
     const mockVitalRef = {} as ReturnType<typeof datadogRum.startDurationVital>
 
     const mockGame: Game = {
-        id: GameId.SongQuiz,
+        id: "song-quiz",
         title: "Song Quiz",
-        trackingId: "song quiz",
         tileImageUrl: "test.avif",
         heroImageUrl: "test-hero.avif",
-        paywallType: PaywallType.Soft,
+        source: "placeholder" as const,
     }
 
     const mockUrl = "https://test.com/game?sessionId=test-123"

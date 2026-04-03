@@ -2,27 +2,24 @@ import type { RenderHookResult } from "@testing-library/react"
 import { renderHook } from "@testing-library/react"
 import { act } from "react"
 
-import { PaywallType } from "../constants/game"
 import { useGameFocusHandler } from "./useGameFocusHandler"
 import type { Game } from "./useGames"
 
 describe("useGameFocusHandler", () => {
     const mockGames: Game[] = [
         {
-            id: "jeopardy" as Game["id"],
-            trackingId: "jeopardy",
+            id: "jeopardy",
             title: "Jeopardy",
             tileImageUrl: "/jeopardy.avif",
             heroImageUrl: "/jeopardy-hero.avif",
-            paywallType: PaywallType.Soft,
+            source: "placeholder" as const,
         },
         {
-            id: "cocomelon" as Game["id"],
-            trackingId: "cocomelon",
+            id: "cocomelon",
             title: "CoComelon",
             tileImageUrl: "/cocomelon.avif",
             heroImageUrl: "/cocomelon-hero.avif",
-            paywallType: PaywallType.Soft,
+            source: "placeholder" as const,
         },
     ]
 
@@ -79,12 +76,11 @@ describe("useGameFocusHandler", () => {
         it("should not update last focused tile for game not in array", () => {
             const { result } = renderUseGameFocusHandler()
             const gameNotInArray: Game = {
-                id: "wheel-of-fortune" as Game["id"],
-                trackingId: "wheel of fortune",
+                id: "wheel-of-fortune",
                 title: "Wheel of Fortune",
                 tileImageUrl: "/wof.avif",
                 heroImageUrl: "/wof-hero.avif",
-                paywallType: PaywallType.Soft,
+                source: "placeholder" as const,
             }
 
             act(() => {

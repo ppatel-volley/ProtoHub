@@ -4,7 +4,6 @@ import { act, type JSX, type ReactNode } from "react"
 
 import { ArrowPressProvider } from "../components/FocusableUI/ArrowPressContext"
 import { isLGOrSamsungTV } from "../config/platformDetection"
-import { PaywallType } from "../constants/game"
 import { logger } from "../utils/logger"
 import {
     FOCUS_RECOVERY_FALLBACK_DELAY_MS,
@@ -23,12 +22,11 @@ type FocusRestorationProps = {
 }
 
 const mockGame: Game = {
-    id: "jeopardy" as Game["id"],
-    trackingId: "jeopardy",
+    id: "jeopardy",
     title: "Jeopardy",
     tileImageUrl: "/jeopardy.avif",
     heroImageUrl: "/jeopardy-hero.avif",
-    paywallType: PaywallType.Soft,
+    source: "placeholder" as const,
 }
 
 jest.mock("@noriginmedia/norigin-spatial-navigation", () => ({

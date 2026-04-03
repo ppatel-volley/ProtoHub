@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen } from "@testing-library/react"
 import React from "react"
 
-import { PaywallType } from "../../../constants/game"
-import { GameId } from "../../../hooks/useGames"
+
+
 import { LaunchedGameState } from "../../../hooks/useLaunchedGameState"
 import { HeroAssetFader, HOVER_DELAY_MS } from "./HeroAssetFader"
 
@@ -106,12 +106,11 @@ describe("HeroAssetFader", () => {
     const mockLaunchedGameState = new LaunchedGameState(
         "https://game.com/session",
         {
-            id: GameId.Jeopardy,
+            id: "jeopardy",
             title: "Test Game",
-            trackingId: "jeopardy",
             tileImageUrl: "tile.avif",
             heroImageUrl: "hero.avif",
-            paywallType: PaywallType.None,
+            source: "placeholder" as const,
         },
         {
             __dd_vital_reference: true,

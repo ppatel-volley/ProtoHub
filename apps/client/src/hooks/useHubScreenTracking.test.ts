@@ -1,7 +1,6 @@
 import { renderHook } from "@testing-library/react"
 
-import { PaywallType } from "../constants/game"
-import { type Game, GameId } from "./useGames"
+import type { Game } from "./useGames"
 import { useHubScreenTracking } from "./useHubScreenTracking"
 
 jest.mock("uuid", () => ({
@@ -18,12 +17,6 @@ jest.mock("../utils/logger", () => ({
 
 jest.mock("./useGames", () => ({
     useGames: jest.fn(),
-    GameId: {
-        Jeopardy: "jeopardy",
-        SongQuiz: "song-quiz",
-        CoComelon: "cocomelon",
-        WheelOfFortune: "wheel-of-fortune",
-    },
 }))
 
 jest.mock("./useHubTracking", () => ({
@@ -40,12 +33,11 @@ describe("useHubScreenTracking", () => {
     const mockGroup = jest.fn()
 
     const createMockGame = (): Game => ({
-        id: GameId.Jeopardy,
-        trackingId: "jeopardy",
+        id: "jeopardy",
         title: "Jeopardy",
         tileImageUrl: "test-tile.avif",
         heroImageUrl: "test-hero.avif",
-        paywallType: PaywallType.Soft,
+        source: "placeholder" as const,
     })
 
     beforeEach(() => {
@@ -58,18 +50,18 @@ describe("useHubScreenTracking", () => {
         })
         mockUseGames.mockReturnValue([
             {
-                id: GameId.Jeopardy,
-                trackingId: "jeopardy",
+                id: "jeopardy",
                 title: "Jeopardy",
                 tileImageUrl: "test-tile.avif",
                 heroImageUrl: "test-hero.avif",
+                source: "placeholder" as const,
             },
             {
-                id: GameId.SongQuiz,
-                trackingId: "song quiz",
+                id: "song-quiz",
                 title: "Song Quiz",
                 tileImageUrl: "test-tile-2.avif",
                 heroImageUrl: "test-hero-2.avif",
+                source: "placeholder" as const,
             },
         ])
     })

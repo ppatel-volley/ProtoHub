@@ -1,7 +1,6 @@
 import { renderHook } from "@testing-library/react"
 
 import { type Deeplink } from "../config/deeplink"
-import { GameId } from "./useGames"
 import {
     HUB_SESSION_START_DELAY_MS,
     HUB_SESSION_START_TIMESTAMP_OFFSET_MS,
@@ -397,7 +396,7 @@ describe("useHubSessionStart", () => {
         })
 
         const deeplink: Deeplink = {
-            gameId: GameId.Jeopardy,
+            gameId: "jeopardy",
             campaignId: "summer2024",
         }
 
@@ -426,7 +425,7 @@ describe("useHubSessionStart", () => {
         })
 
         const initialDeeplink: Deeplink = {
-            gameId: GameId.Jeopardy,
+            gameId: "jeopardy",
             campaignId: "campaign1",
         }
 
@@ -456,7 +455,7 @@ describe("useHubSessionStart", () => {
         mockTrack.mockReset()
 
         const newDeeplink: Deeplink = {
-            gameId: GameId.SongQuiz,
+            gameId: "song-quiz",
             campaignId: "campaign2",
         }
 

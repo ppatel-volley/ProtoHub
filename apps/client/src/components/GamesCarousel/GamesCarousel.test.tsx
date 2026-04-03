@@ -2,10 +2,10 @@ import type { datadogRum } from "@datadog/browser-rum"
 import { act, render as rtlRender, screen } from "@testing-library/react"
 import React, { type JSX, type ReactNode } from "react"
 
-import { GameStatus, PaywallType } from "../../constants/game"
+import { GameStatus } from "../../constants/game"
 import { useFocusTracking } from "../../hooks/useFocusTracking"
 import type { GameLauncher } from "../../hooks/useGameLauncher"
-import { type Game, GameId, useGames } from "../../hooks/useGames"
+import { type Game, useGames } from "../../hooks/useGames"
 import { useHubTracking } from "../../hooks/useHubTracking"
 import { LaunchedGameState } from "../../hooks/useLaunchedGameState"
 import { ArrowPressProvider } from "../FocusableUI/ArrowPressContext"
@@ -140,37 +140,28 @@ jest.mock("../../hooks/useGames", () => ({
     useGames: jest.fn().mockReturnValue([
         {
             id: "jeopardy",
-            trackingId: "jeopardy",
             title: "Jeopardy",
             tileImageUrl: "/jeopardy.avif",
             heroImageUrl: "/jeopardy-hero.avif",
-            paywallType: PaywallType.Soft,
+            source: "placeholder" as const,
         },
         {
             id: "cocomelon",
-            trackingId: "cocomelon",
             title: "CoComelon",
             tileImageUrl: "/cocomelon.avif",
             heroImageUrl: "/cocomelon-hero.avif",
             status: GameStatus.ComingSoon,
-            paywallType: PaywallType.Soft,
+            source: "placeholder" as const,
         },
         {
             id: "wheel-of-fortune",
-            trackingId: "hub",
             title: "Wheel of Fortune",
             tileImageUrl: "wof.avif",
             heroImageUrl: "wof-hero.avif",
             status: GameStatus.ComingSoon,
-            paywallType: PaywallType.Soft,
+            source: "placeholder" as const,
         },
     ]),
-    GameId: {
-        Jeopardy: "jeopardy",
-        SongQuiz: "song-quiz",
-        CoComelon: "cocomelon",
-        WheelOfFortune: "wheel-of-fortune",
-    },
 }))
 
 jest.mock("../../hooks/useFocusTracking", () => ({
@@ -433,29 +424,26 @@ describe("GamesCarousel Component", () => {
             "../GameIframeController/GameIframeController"
         ).GameIframeController as jest.Mock
         const mockGame: Game = {
-            id: GameId.SongQuiz,
+            id: "song-quiz",
             title: "Song Quiz",
-            trackingId: "song quiz",
             tileImageUrl: "test.avif",
             heroImageUrl: "test-hero.avif",
-            paywallType: PaywallType.Soft,
+            source: "placeholder" as const,
         }
         const mockComingSoonGame: Game = {
-            id: GameId.WheelOfFortune,
+            id: "wheel-of-fortune",
             title: "Wheel of Fortune",
-            trackingId: "hub",
             tileImageUrl: "/wof.avif",
             heroImageUrl: "/wof-hero.avif",
-            paywallType: PaywallType.Soft,
+            source: "placeholder" as const,
             status: GameStatus.ComingSoon,
         }
         const mockBetaGame: Game = {
-            id: GameId.SongQuiz,
+            id: "song-quiz",
             title: "Song Quiz",
-            trackingId: "song quiz",
             tileImageUrl: "test.avif",
             heroImageUrl: "test-hero.avif",
-            paywallType: PaywallType.Soft,
+            source: "placeholder" as const,
             status: GameStatus.Beta,
         }
 

@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import React from "react"
 
-import { GameStatus, PaywallType } from "../../constants/game"
-import { type Game, GameId } from "../../hooks/useGames"
+import { GameStatus } from "../../constants/game"
+import type { Game } from "../../hooks/useGames"
 import { GameTile } from "./GameTile"
 
 jest.mock("../../config/envconfig", () => ({
@@ -63,12 +63,11 @@ describe("GameTile Component", () => {
     const MockTileAnimation = jest.requireMock("./TileAnimation")
         .TileAnimation as jest.Mock
     const mockGame: Game = {
-        id: GameId.Jeopardy,
-        trackingId: "jeopardy",
+        id: "jeopardy",
         title: "Jeopardy",
         tileImageUrl: "/jeopardy.avif",
         heroImageUrl: "/jeopardy-hero.avif",
-        paywallType: PaywallType.Soft,
+        source: "placeholder" as const,
     }
 
     beforeEach(() => {
