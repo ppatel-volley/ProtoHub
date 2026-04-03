@@ -37,14 +37,12 @@ export const useInitializationError = ({
             }
         }
 
+        // Foundry: treat platform errors as non-fatal.
+        // The game carousel works without full platform auth.
+        // On Fire TV via VWR, auth-dev.volley.tv returns 401 which
+        // causes a platform error — but the app should still render.
         if (platformStatus.error) {
-            return {
-                type: "PLATFORM_ERROR",
-                message: platformStatus.error.message,
-                trigger: "platform_error",
-                context: "platform_initialization",
-                originalError: platformStatus.error,
-            }
+            console.warn("Platform init error (non-fatal):", platformStatus.error.message)
         }
 
         if (account && !account.anonymousId && !isMobile()) {
