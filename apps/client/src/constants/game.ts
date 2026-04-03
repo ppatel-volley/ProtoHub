@@ -1,15 +1,4 @@
 /**
- * Unique identifier for each game available in the hub.
- */
-export enum GameId {
-    Jeopardy = "jeopardy",
-    SongQuiz = "song-quiz",
-    CoComelon = "cocomelon",
-    WheelOfFortune = "wheel-of-fortune",
-    WitsEnd = "wits-end",
-}
-
-/**
  * Display status shown on a game tile.
  * - ComingSoon: game is not yet available
  * - Beta: game is in beta testing
@@ -21,4 +10,5 @@ export enum GameStatus {
     New = "new",
 }
 
-// PaywallType removed — Proto-Hub games are free (no subscription system)
+// GameId enum removed — Foundry uses dynamic string IDs from useGames.ts
+// PaywallType removed — Foundry games are free (no subscription system)
