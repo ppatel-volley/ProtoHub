@@ -137,8 +137,7 @@ jobs:
 
       - name: Verify deployment
         run: |
-          # Check index.html exists
-          aws s3 head-object \
+          aws s3api head-object \
             --bucket "${S3_BUCKET}" \
             --key "${S3_PREFIX}/index.html" \
             --no-cli-pager
