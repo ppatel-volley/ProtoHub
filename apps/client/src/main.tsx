@@ -59,11 +59,21 @@ window.addEventListener(
 // when gameId === "hub" (via isHub() check in getHubSessionId). Any other
 // gameId causes a crash when volley_hub_session_id is missing from the URL.
 // This also enables VWR RPC integration and automatic ready event emission.
+//
+// trustedOrigins: Proto-Hub runs at protohub-dev.volley.tv but VWR runs at
+// game-clients-dev.volley.tv. BrowserIpc checks event.origin on handshake
+// responses — without adding VWR's origin, the RPC connection times out
+// and D-pad input doesn't work on Fire TV.
 createRoot(rootElement).render(
     <PlatformProvider
         options={{
             ...basePlatformOptions,
             gameId: "hub",
+            trustedOrigins: new Set([
+                "https://game-clients-dev.volley.tv",
+                "https://game-clients-staging.volley.tv",
+                "https://game-clients.volley.tv",
+            ]),
         }}
     >
         <ArrowPressProvider>
