@@ -1,6 +1,8 @@
 import { useFocusable } from "@noriginmedia/norigin-spatial-navigation"
-import { combineStyles } from "@volley/vgf/util"
 import { type JSX, useEffect } from "react"
+
+const combineStyles = (...args: (string | false | null | undefined)[]): string =>
+    args.filter(Boolean).join(" ")
 
 import styles from "./MenuButton.module.scss"
 

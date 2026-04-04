@@ -10,6 +10,7 @@ describe("deeplink util", () => {
     beforeEach(() => {
         // @ts-expect-error override for test
         delete window.location
+        // @ts-expect-error override for test
         window.location = {
             ...originalLocation,
             search: "",
@@ -20,6 +21,7 @@ describe("deeplink util", () => {
     })
 
     afterEach(() => {
+        // @ts-expect-error override for test
         window.location = originalLocation
         window.history.replaceState = originalReplaceState
         jest.clearAllMocks()

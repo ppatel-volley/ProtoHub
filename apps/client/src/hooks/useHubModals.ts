@@ -74,13 +74,15 @@ export const useHubModals = ({
             return
         }
 
-        openExitModal()
+        // Foundry: don't open exit modal from the carousel.
+        // VWR / the native shell handles app exit. Opening the modal
+        // on every Back press steals focus and blocks D-pad input.
+        logger.info("Back button pressed on carousel - ignoring (VWR handles exit)")
     }, [
         showWeekendRebrandModalRef,
         showExitModalRef,
         handleBackButtonInWeekendRebrandModal,
         handleBackButtonInExitModal,
-        openExitModal,
     ])
 
     return {

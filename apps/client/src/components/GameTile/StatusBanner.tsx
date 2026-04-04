@@ -1,19 +1,21 @@
 import React from "react"
 
 import { BASE_URL } from "../../config/envconfig"
-import { GameStatus } from "../../constants/game"
+import type { Game } from "../../hooks/useGames"
 import { FallbackImage } from "../FallbackImage"
 import styles from "./GameTile.module.scss"
 
+type StatusValue = NonNullable<Game["status"]>
+
 interface StatusBannerProps {
-    status: GameStatus
+    status: StatusValue
 }
 
-const getImagePath = (status: GameStatus): string => {
-    const imageMap: Record<GameStatus, string> = {
-        [GameStatus.ComingSoon]: "coming-soon.avif",
-        [GameStatus.Beta]: "beta.avif",
-        [GameStatus.New]: "new.avif",
+const getImagePath = (status: StatusValue): string => {
+    const imageMap: Record<StatusValue, string> = {
+        "coming-soon": "coming-soon.avif",
+        "beta": "beta.avif",
+        "new": "new.avif",
     }
     return `${BASE_URL}assets/images/ui/tags/${imageMap[status]}`
 }
