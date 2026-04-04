@@ -1,6 +1,8 @@
 import type { Plugin } from "vite"
 
-export const BASE_PATH = "/"
+// Served from game-clients-dev.volley.tv/protohub/ (same origin as VWR)
+// so BrowserIpc RPC works for D-pad forwarding on Fire TV.
+export const BASE_PATH = "/protohub/"
 
 export const htmlFaviconPlugin = (): Plugin => {
     return {

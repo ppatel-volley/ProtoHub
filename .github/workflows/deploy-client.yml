@@ -46,7 +46,10 @@ jobs:
         run: |
           ENV="${{ inputs.environment || 'dev' }}"
           echo "ENV=$ENV" >> "$GITHUB_ENV"
-          echo "S3_BUCKET=crucible-clients-$ENV" >> "$GITHUB_ENV"
+          # Deploy to the same S3 bucket as the Hub so Proto-Hub shares
+          # the same origin (game-clients-dev.volley.tv). This is required
+          # for BrowserIpc RPC with VWR — different origins get rejected.
+          echo "S3_BUCKET=volley-game-clients-$ENV" >> "$GITHUB_ENV"
 
           if [ "$ENV" = "dev" ]; then
             echo "BIFROST_API_URL=https://bifrost-api.volley-services.net" >> "$GITHUB_ENV"
