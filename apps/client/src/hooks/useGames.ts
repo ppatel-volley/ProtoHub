@@ -82,8 +82,8 @@ const KNOWN_BIFROST_GAMES: Game[] = [
     {
         id: "word-smiths",
         title: "Word Smiths",
-        tileImageUrl: `${BASE_URL}assets/images/games/tiles/default-prototype.webp`,
-        heroImageUrl: `${BASE_URL}assets/images/games/heroes/default-prototype.webp`,
+        tileImageUrl: `${BASE_URL}assets/images/games/tiles/word-smiths.webp`,
+        heroImageUrl: `${BASE_URL}assets/images/games/heroes/word-smiths.webp`,
         source: "bifrost",
         deploymentUrl: "https://word-smiths.volley-services.net",
         status: "beta",
@@ -91,8 +91,8 @@ const KNOWN_BIFROST_GAMES: Game[] = [
     {
         id: "space-invaders",
         title: "Space Invaders",
-        tileImageUrl: `${BASE_URL}assets/images/games/tiles/default-prototype.webp`,
-        heroImageUrl: `${BASE_URL}assets/images/games/heroes/default-prototype.webp`,
+        tileImageUrl: `${BASE_URL}assets/images/games/tiles/space-invaders.webp`,
+        heroImageUrl: `${BASE_URL}assets/images/games/heroes/space-invaders.webp`,
         source: "bifrost",
         deploymentUrl: "https://space-invaders.volley-services.net",
         status: "beta",
@@ -100,8 +100,8 @@ const KNOWN_BIFROST_GAMES: Game[] = [
     {
         id: "tictactoe",
         title: "Tic-Tac-Toe",
-        tileImageUrl: `${BASE_URL}assets/images/games/tiles/default-prototype.webp`,
-        heroImageUrl: `${BASE_URL}assets/images/games/heroes/default-prototype.webp`,
+        tileImageUrl: `${BASE_URL}assets/images/games/tiles/tictactoe.webp`,
+        heroImageUrl: `${BASE_URL}assets/images/games/heroes/tictactoe.webp`,
         source: "bifrost",
         deploymentUrl: "https://tictactoe.volley-services.net",
         status: "beta",
