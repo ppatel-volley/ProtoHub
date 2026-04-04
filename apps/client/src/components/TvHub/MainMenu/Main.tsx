@@ -232,7 +232,7 @@ const MainContent: React.FC<{
                             />
                         )}
                     </div>
-                    <div className={styles.carouselSection}>
+                    <div className={styles.carouselSection} style={{ border: '3px solid red', zIndex: 9999, background: 'rgba(0,0,0,0.7)' }}>
                         {requiredImagesLoaded && launchedGameState === null && (
                             <GamesCarousel
                                 onGameFocus={handleGameFocus}
